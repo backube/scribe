@@ -26,7 +26,6 @@ allowedCapabilities:
 - SYS_CHROOT
 fsGroup:
   type: RunAsAny
-priority: 10
 readOnlyRootFilesystem: false
 requiredDropCapabilities: [MKNOD]
 runAsUser:
