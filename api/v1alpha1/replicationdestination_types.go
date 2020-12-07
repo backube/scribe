@@ -102,6 +102,9 @@ type ReplicationDestinationRsyncSpec struct {
 	// sshUser is the username for outgoing SSH connections. Defaults to "root".
 	//+optional
 	SSHUser *string `json:"sshUser,omitempty"`
+	// pauseSync bool to pause the rsync of data". Defaults to false.
+	//+optional
+	PauseSync bool `json:"pauseSync,omitempty"`
 }
 
 type ReplicationDestinationRcloneSpec struct {

@@ -54,6 +54,7 @@ type ReplicationDestinationReconciler struct {
 
 //nolint:lll
 //+kubebuilder:rbac:groups=scribe.backube,resources=replicationdestinations,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=scribe.backube,resources=replicationdestinations/finalizers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=scribe.backube,resources=replicationdestinations/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
@@ -283,12 +284,17 @@ func (r *rsyncDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 		if r.job.Spec.Template.ObjectMeta.Labels == nil {
 			r.job.Spec.Template.ObjectMeta.Labels = map[string]string{}
 		}
+		if r.Instance.Status.Rsync.PauseSync {
+			err := r.Client.Delete(r.Ctx, r.job, client.PropagationPolicy(metav1.DeletePropagationBackground))
+			logger.Error(err, "destination sync has been paused")
+			return err
+		}
 		for k, v := range r.serviceSelector() {
 			r.job.Spec.Template.ObjectMeta.Labels[k] = v
 		}
 		backoffLimit := int32(2)
 		r.job.Spec.BackoffLimit = &backoffLimit
-		if len(r.job.Spec.Template.Spec.Containers) != 1 {
+		if len(r.job.Spec.Template.Spec.Containers) != 1 && (!r.Instance.Status.Rsync.PauseSync) {
 			r.job.Spec.Template.Spec.Containers = []corev1.Container{{}}
 		}
 		r.job.Spec.Template.Spec.Containers[0].Name = "rsync"
@@ -297,7 +303,10 @@ func (r *rsyncDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 		runAsUser := int64(0)
 		r.job.Spec.Template.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
-				Add: []corev1.Capability{"AUDIT_WRITE"},
+				Add: []corev1.Capability{
+					"AUDIT_WRITE",
+					"SYS_CHROOT",
+				},
 			},
 			RunAsUser: &runAsUser,
 		}
