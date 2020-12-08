@@ -342,6 +342,7 @@ func (r *rsyncDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 		return false, err
 	}
 
+	// If PauseSync has been issued but Parallelism is not 0 delete job
 	if r.Instance.Spec.Rsync.PauseSync && *r.job.Spec.Parallelism != int32(0) {
 		logger.Info("deleting job -- Redeploying job Sync Paused")
 		err = r.Client.Delete(r.Ctx, r.job, client.PropagationPolicy(metav1.DeletePropagationBackground))
