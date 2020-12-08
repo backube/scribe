@@ -291,8 +291,7 @@ func (r *rsyncDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 		if !r.Instance.Spec.Rsync.PauseSync {
 			parallelism := int32(1)
 			r.job.Spec.Parallelism = &parallelism
-		}
-		if r.Instance.Spec.Rsync.PauseSync {
+		} else {
 			parallelism := int32(0)
 			r.job.Spec.Parallelism = &parallelism
 		}
