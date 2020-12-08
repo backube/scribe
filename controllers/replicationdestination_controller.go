@@ -288,6 +288,14 @@ func (r *rsyncDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 		}
 		backoffLimit := int32(2)
 		r.job.Spec.BackoffLimit = &backoffLimit
+		if !r.Instance.Spec.Rsync.PauseSync {
+			parallelism := int32(1)
+			r.job.Spec.Parallelism = &parallelism
+		}
+		if r.Instance.Spec.Rsync.PauseSync {
+			parallelism := int32(0)
+			r.job.Spec.Parallelism = &parallelism
+		}
 		if len(r.job.Spec.Template.Spec.Containers) != 1 {
 			r.job.Spec.Template.Spec.Containers = []corev1.Container{{}}
 		}
@@ -330,6 +338,12 @@ func (r *rsyncDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 	// If Job had failed, delete it so it can be recreated
 	if r.job.Status.Failed == *r.job.Spec.BackoffLimit {
 		logger.Info("deleting job -- backoff limit reached")
+		err = r.Client.Delete(r.Ctx, r.job, client.PropagationPolicy(metav1.DeletePropagationBackground))
+		return false, err
+	}
+
+	if r.Instance.Spec.Rsync.PauseSync && *r.job.Spec.Parallelism != int32(0) {
+		logger.Info("deleting job -- Redeploying job Sync Paused")
 		err = r.Client.Delete(r.Ctx, r.job, client.PropagationPolicy(metav1.DeletePropagationBackground))
 		return false, err
 	}

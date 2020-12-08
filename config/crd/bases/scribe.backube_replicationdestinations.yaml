@@ -155,6 +155,10 @@ spec:
                     description: path is the remote path to rsync from. Defaults to
                       "/"
                     type: string
+                  pauseSync:
+                    description: pauseSync bool to pause the rsync of data". Defaults
+                      to false.
+                    type: boolean
                   port:
                     description: port is the SSH port to connect to for replication.
                       Defaults to 22.
