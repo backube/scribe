@@ -3,36 +3,21 @@ package controllers
 
 import (
 	"context"
-	"time"
 
-	//snapv1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
 	snapv1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	"github.com/operator-framework/operator-lib/status"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	//batchv1 "k8s.io/api/batch/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
-
-	//"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-
-	//"k8s.io/apimachinery/pkg/types"
-	//"k8s.io/apimachinery/pkg/util/intstr"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	scribev1alpha1 "github.com/backube/scribe/api/v1alpha1"
-)
-
-const (
-	duration = 5 * time.Second
-	maxWait  = 60 * time.Second
-	interval = 250 * time.Millisecond
 )
 
 var _ = Describe("ReplicationDestination", func() {
@@ -207,6 +192,11 @@ var _ = Describe("ReplicationDestination", func() {
 					return k8sClient.Get(ctx, nameFor(svc), svc)
 				}, maxWait, interval).Should(Succeed())
 				Expect(svc.Spec.Type).To(Equal(corev1.ServiceTypeLoadBalancer))
+				// test env doesn't support LB, so fake the address
+				svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{
+					{IP: "127.0.0.1"},
+				}
+				Expect(k8sClient.Status().Update(ctx, svc)).To(Succeed())
 				Eventually(func() *string {
 					_ = k8sClient.Get(ctx, nameFor(rd), rd)
 					if rd.Status == nil || rd.Status.Rsync == nil {
@@ -225,7 +215,7 @@ var _ = Describe("ReplicationDestination", func() {
 			var pvcName string
 			volumes := job.Spec.Template.Spec.Volumes
 			for _, v := range volumes {
-				if v.PersistentVolumeClaim != nil && v.Name == "data" {
+				if v.PersistentVolumeClaim != nil && v.Name == dataVolumeName {
 					pvcName = v.PersistentVolumeClaim.ClaimName
 				}
 			}
@@ -251,7 +241,7 @@ var _ = Describe("ReplicationDestination", func() {
 				var pvcName string
 				volumes := job.Spec.Template.Spec.Volumes
 				for _, v := range volumes {
-					if v.PersistentVolumeClaim != nil && v.Name == "data" {
+					if v.PersistentVolumeClaim != nil && v.Name == dataVolumeName {
 						pvcName = v.PersistentVolumeClaim.ClaimName
 					}
 				}
@@ -286,6 +276,7 @@ var _ = Describe("ReplicationDestination", func() {
 			Expect(secret).To(beOwnedBy(rd))
 		})
 
+		//nolint:dupl
 		Context("when ssh keys are provided", func() {
 			var secret *v1.Secret
 			BeforeEach(func() {
