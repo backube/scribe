@@ -354,16 +354,21 @@ func (r *rsyncSrcReconciler) ensureJob(l logr.Logger) (bool, error) {
 			r.job.Spec.Template.ObjectMeta.Labels[k] = v
 		}
 		backoffLimit := int32(2)
-		disabledSync := "disabled"
-		enabledSync := "enabled"
-		syncValue := *r.Instance.Spec.Rsync.DataSync
 		r.job.Spec.BackoffLimit = &backoffLimit
-		if r.Instance.Spec.Rsync.DataSync == nil || syncValue == enabledSync {
+		if r.Instance.Spec.Rsync.DataSync == nil {
 			parallelism := int32(1)
 			r.job.Spec.Parallelism = &parallelism
-		} else if syncValue == disabledSync {
-			parallelism := int32(0)
-			r.job.Spec.Parallelism = &parallelism
+		} else if r.Instance.Spec.Rsync.DataSync != nil {
+			syncValue := *r.Instance.Spec.Rsync.DataSync
+			disabledSync := "disabled"
+			enabledSync := "enabled"
+			if syncValue == disabledSync {
+				parallelism := int32(0)
+				r.job.Spec.Parallelism = &parallelism
+			} else if syncValue == enabledSync {
+				parallelism := int32(1)
+				r.job.Spec.Parallelism = &parallelism
+			}
 		}
 		if len(r.job.Spec.Template.Spec.Containers) != 1 {
 			r.job.Spec.Template.Spec.Containers = []corev1.Container{{}}
