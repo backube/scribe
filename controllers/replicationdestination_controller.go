@@ -315,12 +315,14 @@ func (r *rsyncDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 			r.job.Spec.Template.ObjectMeta.Labels[k] = v
 		}
 		backoffLimit := int32(2)
+		disabledSync := "disabled"
+		enabledSync := "enabled"
+		syncValue := *r.Instance.Spec.Rsync.DataSync
 		r.job.Spec.BackoffLimit = &backoffLimit
-		defaultSync := "enabled"
-		if r.Instance.Spec.Rsync.DataSync == &defaultSync || r.Instance.Spec.Rsync.DataSync == nil {
+		if r.Instance.Spec.Rsync.DataSync == nil || syncValue == enabledSync {
 			parallelism := int32(1)
 			r.job.Spec.Parallelism = &parallelism
-		} else {
+		} else if syncValue == disabledSync {
 			parallelism := int32(0)
 			r.job.Spec.Parallelism = &parallelism
 		}
