@@ -253,6 +253,21 @@ var _ = Describe("ReplicationDestination", func() {
 			})
 		})
 
+		Context("when a dataSync is disabled", func() {
+			noSync := "disabled"
+			parallelism := int32(0)
+			BeforeEach(func() {
+				rd.Spec.Rsync.DataSync = &noSync
+			})
+			It("is used to define parallelism", func() {
+				job := &batchv1.Job{}
+				Eventually(func() error {
+					return k8sClient.Get(ctx, types.NamespacedName{Name: "scribe-rsync-dest-" + rd.Name, Namespace: rd.Namespace}, job)
+				}, maxWait, interval).Should(Succeed())
+				Expect(*job.Spec.Parallelism).To(Equal(parallelism))
+			})
+		})
+
 		It("Generates ssh keys automatically", func() {
 			secret := &v1.Secret{}
 			Eventually(func() *scribev1alpha1.ReplicationDestinationStatus {
