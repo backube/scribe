@@ -109,6 +109,9 @@ type ReplicationSourceRsyncSpec struct {
 	// sshUser is the username for outgoing SSH connections. Defaults to "root".
 	//+optional
 	SSHUser *string `json:"sshUser,omitempty"`
+	// DataSync can be used to temporarily stop replication. Defaults to "enabled".
+	//+optional
+	DataSync *string `json:"dataSync,omitempty"`
 }
 
 type ReplicationSourceRcloneSpec struct {

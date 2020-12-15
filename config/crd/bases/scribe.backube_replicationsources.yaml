@@ -142,6 +142,10 @@ spec:
                     - Clone
                     - Snapshot
                     type: string
+                  dataSync:
+                    description: DataSync can be used to temporarily stop replication.
+                      Defaults to "enabled".
+                    type: string
                   path:
                     description: path is the remote path to rsync to. Defaults to
                       "/"
