@@ -132,24 +132,6 @@ var _ = Describe("ReplicationSource", func() {
 		})
 	})
 
-	Context("when dataSync is disabled", func() {
-		parallelism := int32(0)
-		BeforeEach(func() {
-			noSync := "disabled"
-			rs.Spec.Rsync = &scribev1alpha1.ReplicationSourceRsyncSpec{
-				DataSync: &noSync,
-			}
-		})
-		It("is used to define parallelism", func() {
-			job := &batchv1.Job{}
-			Eventually(func() error {
-				return k8sClient.Get(ctx, types.NamespacedName{Name: "scribe-rsync-src-" + rs.Name, Namespace: rs.Namespace}, job)
-			}, maxWait, interval).Should(Succeed())
-			actualParallelism := job.Spec.Parallelism
-			Expect(actualParallelism).To(Equal(parallelism))
-		})
-	})
-
 	Context("when a copyMethod of None is specified", func() {
 		BeforeEach(func() {
 			rs.Spec.Rsync = &scribev1alpha1.ReplicationSourceRsyncSpec{
