@@ -360,8 +360,8 @@ func (r *rsyncSrcReconciler) ensureJob(l logr.Logger) (bool, error) {
 			r.job.Spec.Parallelism = &parallelism
 		} else if r.Instance.Spec.Rsync.DataSync != nil {
 			syncValue := *r.Instance.Spec.Rsync.DataSync
-			disabledSync := "disabled"
-			enabledSync := "enabled"
+			const disabledSync = "disabled"
+			const enabledSync = "enabled"
 			if syncValue == disabledSync {
 				parallelism := int32(0)
 				r.job.Spec.Parallelism = &parallelism
