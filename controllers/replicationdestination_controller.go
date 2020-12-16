@@ -321,8 +321,8 @@ func (r *rsyncDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 			r.job.Spec.Parallelism = &parallelism
 		} else if r.Instance.Spec.Rsync.DataSync != nil {
 			syncValue := *r.Instance.Spec.Rsync.DataSync
-			const disabledSync = "disabled"
-			const enabledSync = "enabled"
+			disabledSync := "disabled"
+			enabledSync := "enabled"
 			if syncValue == disabledSync {
 				parallelism := int32(0)
 				r.job.Spec.Parallelism = &parallelism
