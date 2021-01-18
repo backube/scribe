@@ -280,7 +280,7 @@ var _ = Describe("ReplicationSource", func() {
 				// Job, so we need to fake the binding
 				snap := &snapv1.VolumeSnapshot{
 					ObjectMeta: metav1.ObjectMeta{
-						Name:      "scribe-rsync-src-" + rs.Name,
+						Name:      "scribe-src-" + rs.Name,
 						Namespace: rs.Namespace,
 					},
 				}
@@ -314,6 +314,25 @@ var _ = Describe("ReplicationSource", func() {
 				Expect(*pvc.Spec.Resources.Requests.Storage()).To(Equal(newCapacity))
 				Expect(*pvc.Spec.StorageClassName).To(Equal(newSC))
 			})
+		})
+	})
+
+	Context("when the value of paused is set to true", func() {
+		parallelism := int32(0)
+		BeforeEach(func() {
+			rs.Spec.Paused = true
+			rs.Spec.Rsync = &scribev1alpha1.ReplicationSourceRsyncSpec{
+				ReplicationSourceVolumeOptions: scribev1alpha1.ReplicationSourceVolumeOptions{
+					CopyMethod: scribev1alpha1.CopyMethodClone,
+				},
+			}
+		})
+		It("the job will create but will not run", func() {
+			job := &batchv1.Job{}
+			Eventually(func() error {
+				return k8sClient.Get(ctx, types.NamespacedName{Name: "scribe-rsync-src-" + rs.Name, Namespace: rs.Namespace}, job)
+			}, maxWait, interval).Should(Succeed())
+			Expect(*job.Spec.Parallelism).To(Equal(parallelism))
 		})
 	})
 
