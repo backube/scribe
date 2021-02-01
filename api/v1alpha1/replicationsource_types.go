@@ -109,6 +109,10 @@ type ReplicationSourceRsyncSpec struct {
 	// sshUser is the username for outgoing SSH connections. Defaults to "root".
 	//+optional
 	SSHUser *string `json:"sshUser,omitempty"`
+	// ReverseSync is used to change the sync direction. This causes data to be
+	// pulled by the source rather than pushed. Defaults to "standard".
+	//+optional
+	ReverseSync bool `json:"reverseDirection,omitempty"`
 }
 
 // ReplicationSourceRcloneSpec defines the field for rclone in replicationSource.

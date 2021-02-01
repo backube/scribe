@@ -160,6 +160,11 @@ spec:
                     maximum: 65535
                     minimum: 0
                     type: integer
+                  reverseDirection:
+                    description: ReverseSync is used to change the sync direction.
+                      This causes data to be pulled by the source rather than pushed.
+                      Defaults to "standard".
+                    type: boolean
                   serviceType:
                     description: serviceType determines the Service type that will
                       be created for incoming SSH connections.

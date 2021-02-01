@@ -540,11 +540,21 @@ func (r *rsyncSrcReconciler) ensureJob(l logr.Logger) (bool, error) {
 		}
 		r.job.Spec.Template.Spec.Containers[0].Name = "rsync"
 		if r.Instance.Spec.Rsync.Address != nil {
-			r.job.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
-				{Name: "DESTINATION_ADDRESS", Value: *r.Instance.Spec.Rsync.Address},
+			if r.Instance.Spec.Rsync.ReverseSync {
+				r.job.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
+					{Name: "DESTINATION_ADDRESS", Value: *r.Instance.Spec.Rsync.Address},
+					{Name: "REVERSE_SYNC", Value: "reverse"},
+				}
 			}
 		} else {
-			r.job.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{}
+			if r.Instance.Spec.Rsync.ReverseSync {
+				r.job.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
+					{Name: "REVERSE_SYNC", Value: "reverse"},
+				}
+				r.job.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{}
+			} else {
+				r.job.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{}
+			}
 		}
 		r.job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/bash", "-c", "/source.sh"}
 		r.job.Spec.Template.Spec.Containers[0].Image = RsyncContainerImage

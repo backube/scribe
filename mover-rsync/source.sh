@@ -41,7 +41,13 @@ SSHCONFIG
 
 echo "Syncing data to ${DESTINATION_ADDRESS}:${DESTINATION_PORT} ..."
 START_TIME=$SECONDS
-rsync -aAhHSxz --delete --itemize-changes --info=stats2,misc2 /data/ "root@${DESTINATION_ADDRESS}":.
+if [ -z ${REVERSE_SYNC} ]; then
+	rsync -aAhHSxz --delete --itemize-changes --info=stats2,misc2 "root@${DESTINATION_ADDRESS}":. /data/
+	echo "Syncing data to ${DESTINATION_ADDRESS}:${DESTINATION_PORT} ..."
+else
+	rsync -aAhHSxz --delete --itemize-changes --info=stats2,misc2 /data/ "root@${DESTINATION_ADDRESS}":.
+	echo "Syncing data from ${DESTINATION_ADDRESS}:${DESTINATION_PORT} ..."
+fi
 rc=$?
 echo "Rsync completed in $(( SECONDS - START_TIME ))s"
 if [[ $rc -eq 0 ]]; then
