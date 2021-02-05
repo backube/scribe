@@ -20,6 +20,7 @@ package controllers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -66,6 +67,7 @@ type ReplicationSourceReconciler struct {
 //+kubebuilder:rbac:groups=security.openshift.io,resources=securitycontextconstraints,resourceNames=scribe-mover,verbs=use
 //+kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;list;watch;create;update;patch;delete
 
+//nolint:funlen
 func (r *ReplicationSourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	ctx := context.Background()
 	logger := r.Log.WithValues("replicationsource", req.NamespacedName)
@@ -86,7 +88,11 @@ func (r *ReplicationSourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, 
 
 	var result ctrl.Result
 	var err error
-	if inst.Spec.Rsync != nil {
+	if inst.Spec.Rsync != nil && inst.Spec.Rclone != nil ||
+		inst.Spec.External != nil && inst.Spec.Rclone != nil ||
+		inst.Spec.Rsync != nil && inst.Spec.External != nil {
+		err = fmt.Errorf("only a single replication method can be provided")
+	} else if inst.Spec.Rsync != nil {
 		result, err = RunRsyncSrcReconciler(ctx, inst, r, logger)
 	} else if inst.Spec.Rclone != nil {
 		result, err = RunRcloneSrcReconciler(ctx, inst, r, logger)
@@ -143,19 +149,9 @@ func (r *ReplicationSourceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// Check schedule to see if it's time to sync
-func awaitNextSyncSource(rs *scribev1alpha1.ReplicationSource, logger logr.Logger) (bool, error) {
-	if cont, err := ensureNextSyncValidSource(rs, logger); !cont || err != nil {
-		return cont, err
-	}
-	if !rs.Status.NextSyncTime.IsZero() && rs.Status.NextSyncTime.Time.After(time.Now()) {
-		return false, nil
-	}
-	return true, nil
-}
-
-// Set the next sync time accd to the schedule
+//nolint:dupl
 func updateNextSyncSource(rs *scribev1alpha1.ReplicationSource, logger logr.Logger) (bool, error) {
+	// if there's a schedule
 	if rs.Spec.Trigger != nil && rs.Spec.Trigger.Schedule != nil {
 		parser := cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
 		schedule, err := parser.Parse(*rs.Spec.Trigger.Schedule)
@@ -163,22 +159,37 @@ func updateNextSyncSource(rs *scribev1alpha1.ReplicationSource, logger logr.Logg
 			logger.Error(err, "error parsing schedule", "cronspec", rs.Spec.Trigger.Schedule)
 			return false, err
 		}
-		next := schedule.Next(time.Now())
-		rs.Status.NextSyncTime = &metav1.Time{Time: next}
+
+		// If we've previously completed a sync
+		if rs.Status.LastSyncTime != nil {
+			next := schedule.Next(rs.Status.LastSyncTime.Time)
+			rs.Status.NextSyncTime = &metav1.Time{Time: next}
+		} else { // Never synced before, so we should ASAP
+			rs.Status.NextSyncTime = &metav1.Time{Time: time.Now()}
+		}
+	} else { // No schedule, so there's no "next"
+		rs.Status.NextSyncTime = nil
 	}
+
 	return true, nil
 }
 
-// Make sure the next sync time is valid based on the schedule
-func ensureNextSyncValidSource(rs *scribev1alpha1.ReplicationSource, logger logr.Logger) (bool, error) {
-	if rs.Spec.Trigger != nil && rs.Spec.Trigger.Schedule != nil {
-		if rs.Status.NextSyncTime == nil {
-			return updateNextSyncSource(rs, logger)
-		}
+func awaitNextSyncSource(rs *scribev1alpha1.ReplicationSource, logger logr.Logger) (bool, error) {
+	// Ensure nextSyncTime is correct
+	if cont, err := updateNextSyncSource(rs, logger); !cont || err != nil {
+		return cont, err
+	}
+
+	// If there's no next (no schedule) or we're past the nextSyncTime, we should sync
+	if rs.Status.NextSyncTime.IsZero() || rs.Status.NextSyncTime.Time.Before(time.Now()) {
 		return true, nil
 	}
-	rs.Status.NextSyncTime = nil
-	return true, nil
+	return false, nil
+}
+
+func updateLastSyncSource(rs *scribev1alpha1.ReplicationSource, logger logr.Logger) (bool, error) {
+	rs.Status.LastSyncTime = &metav1.Time{Time: time.Now()}
+	return updateNextSyncSource(rs, logger)
 }
 
 type rsyncSrcReconciler struct {
@@ -197,6 +208,7 @@ type rcloneSrcReconciler struct {
 	job                *batchv1.Job
 }
 
+//nolint:dupl
 func RunRsyncSrcReconciler(ctx context.Context, instance *scribev1alpha1.ReplicationSource,
 	sr *ReplicationSourceReconciler, logger logr.Logger) (ctrl.Result, error) {
 	r := rsyncSrcReconciler{
@@ -219,9 +231,6 @@ func RunRsyncSrcReconciler(ctx context.Context, instance *scribev1alpha1.Replica
 	awaitNextSync := func(l logr.Logger) (bool, error) {
 		return awaitNextSyncSource(r.Instance, l)
 	}
-	updateNextsync := func(l logr.Logger) (bool, error) {
-		return updateNextSyncSource(r.Instance, l)
-	}
 
 	_, err := reconcileBatch(l,
 		awaitNextSync,
@@ -233,7 +242,6 @@ func RunRsyncSrcReconciler(ctx context.Context, instance *scribev1alpha1.Replica
 		r.ensureJob,
 		r.cleanupJob,
 		r.CleanupPVC,
-		updateNextsync,
 	)
 	return ctrl.Result{}, err
 }
@@ -256,9 +264,6 @@ func RunRcloneSrcReconciler(ctx context.Context, instance *scribev1alpha1.Replic
 	awaitNextSync := func(l logr.Logger) (bool, error) {
 		return awaitNextSyncSource(r.Instance, l)
 	}
-	updateNextsync := func(l logr.Logger) (bool, error) {
-		return updateNextSyncSource(r.Instance, l)
-	}
 
 	_, err := reconcileBatch(l,
 		awaitNextSync,
@@ -269,7 +274,6 @@ func RunRcloneSrcReconciler(ctx context.Context, instance *scribev1alpha1.Replic
 		r.ensureJob,
 		r.cleanupJob,
 		r.CleanupPVC,
-		updateNextsync,
 	)
 	return ctrl.Result{}, err
 }
@@ -294,6 +298,13 @@ func (r *rcloneSrcReconciler) ensureJob(l logr.Logger) (bool, error) {
 		}
 		backoffLimit := int32(2)
 		r.job.Spec.BackoffLimit = &backoffLimit
+		if r.Instance.Spec.Paused {
+			parallelism := int32(0)
+			r.job.Spec.Parallelism = &parallelism
+		} else {
+			parallelism := int32(1)
+			r.job.Spec.Parallelism = &parallelism
+		}
 		if len(r.job.Spec.Template.Spec.Containers) != 1 {
 			r.job.Spec.Template.Spec.Containers = []corev1.Container{{}}
 		}
@@ -589,7 +600,9 @@ func (r *rsyncSrcReconciler) ensureJob(l logr.Logger) (bool, error) {
 func (r *rsyncSrcReconciler) cleanupJob(l logr.Logger) (bool, error) {
 	logger := l.WithValues("job", r.job)
 	// update time/duration
-	r.Instance.Status.LastSyncTime = &metav1.Time{Time: time.Now()}
+	if _, err := updateLastSyncSource(r.Instance, logger); err != nil {
+		return false, err
+	}
 	if r.job.Status.StartTime != nil {
 		d := r.Instance.Status.LastSyncTime.Sub(r.job.Status.StartTime.Time)
 		r.Instance.Status.LastSyncDuration = &metav1.Duration{Duration: d}
@@ -605,7 +618,9 @@ func (r *rsyncSrcReconciler) cleanupJob(l logr.Logger) (bool, error) {
 func (r *rcloneSrcReconciler) cleanupJob(l logr.Logger) (bool, error) {
 	logger := l.WithValues("job", r.job)
 	// update time/duration
-	r.Instance.Status.LastSyncTime = &metav1.Time{Time: time.Now()}
+	if _, err := updateLastSyncSource(r.Instance, logger); err != nil {
+		return false, err
+	}
 	if r.job.Status.StartTime != nil {
 		d := r.Instance.Status.LastSyncTime.Sub(r.job.Status.StartTime.Time)
 		r.Instance.Status.LastSyncDuration = &metav1.Duration{Duration: d}
