@@ -8,10 +8,10 @@ import (
 	snapv1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"github.com/operator-framework/operator-lib/status"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -25,7 +25,7 @@ import (
 //nolint:dupl
 var _ = Describe("Destination scheduling", func() {
 	var rd *scribev1alpha1.ReplicationDestination
-	logger := zap.LoggerTo(GinkgoWriter, true)
+	logger := zap.New(zap.UseDevMode(true), zap.WriteTo(GinkgoWriter))
 
 	BeforeEach(func() {
 		rd = &scribev1alpha1.ReplicationDestination{
@@ -198,10 +198,10 @@ var _ = Describe("ReplicationDestination", func() {
 				_ = k8sClient.Get(ctx, nameFor(rd), rd)
 				return rd.Status
 			}, maxWait, interval).Should(Not(BeNil()))
-			var cond *status.Condition
-			Eventually(func() *status.Condition {
+			var cond *metav1.Condition
+			Eventually(func() *metav1.Condition {
 				_ = k8sClient.Get(ctx, nameFor(rd), rd)
-				cond = rd.Status.Conditions.GetCondition(scribev1alpha1.ConditionReconciled)
+				cond = meta.FindStatusCondition(rd.Status.Conditions, scribev1alpha1.ConditionReconciled)
 				return cond
 			}, maxWait, interval).Should(Not(BeNil()))
 			Expect(cond.Status).To(Equal(corev1.ConditionFalse))

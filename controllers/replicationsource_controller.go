@@ -25,12 +25,12 @@ import (
 
 	"github.com/go-logr/logr"
 	snapv1 "github.com/kubernetes-csi/external-snapshotter/v2/pkg/apis/volumesnapshot/v1beta1"
-	"github.com/operator-framework/operator-lib/status"
 	cron "github.com/robfig/cron/v3"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -68,8 +68,8 @@ type ReplicationSourceReconciler struct {
 //+kubebuilder:rbac:groups=snapshot.storage.k8s.io,resources=volumesnapshots,verbs=get;list;watch;create;update;patch;delete
 
 //nolint:funlen
-func (r *ReplicationSourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	ctx := context.Background()
+func (r *ReplicationSourceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	ctx = context.Background()
 	logger := r.Log.WithValues("replicationsource", req.NamespacedName)
 	inst := &scribev1alpha1.ReplicationSource{}
 	if err := r.Client.Get(ctx, req.NamespacedName, inst); err != nil {
@@ -83,7 +83,7 @@ func (r *ReplicationSourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, 
 		inst.Status = &scribev1alpha1.ReplicationSourceStatus{}
 	}
 	if inst.Status.Conditions == nil {
-		inst.Status.Conditions = status.Conditions{}
+		inst.Status.Conditions = []metav1.Condition{}
 	}
 
 	var result ctrl.Result
@@ -102,18 +102,18 @@ func (r *ReplicationSourceReconciler) Reconcile(req ctrl.Request) (ctrl.Result, 
 
 	// Set reconcile status condition
 	if err == nil {
-		inst.Status.Conditions.SetCondition(
-			status.Condition{
+		meta.SetStatusCondition(&inst.Status.Conditions,
+			metav1.Condition{
 				Type:    scribev1alpha1.ConditionReconciled,
-				Status:  corev1.ConditionTrue,
+				Status:  metav1.ConditionTrue,
 				Reason:  scribev1alpha1.ReconciledReasonComplete,
 				Message: "Reconcile complete",
 			})
 	} else {
-		inst.Status.Conditions.SetCondition(
-			status.Condition{
+		meta.SetStatusCondition(&inst.Status.Conditions,
+			metav1.Condition{
 				Type:    scribev1alpha1.ConditionReconciled,
-				Status:  corev1.ConditionFalse,
+				Status:  metav1.ConditionFalse,
 				Reason:  scribev1alpha1.ReconciledReasonError,
 				Message: err.Error(),
 			})

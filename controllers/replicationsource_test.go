@@ -22,7 +22,7 @@ import (
 //nolint:dupl
 var _ = Describe("Source scheduling", func() {
 	var rs *scribev1alpha1.ReplicationSource
-	logger := zap.LoggerTo(GinkgoWriter, true)
+	logger := zap.New(zap.UseDevMode(true), zap.WriteTo(GinkgoWriter))
 
 	BeforeEach(func() {
 		rs = &scribev1alpha1.ReplicationSource{
