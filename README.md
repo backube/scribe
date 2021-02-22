@@ -1,7 +1,7 @@
 # Scribe
 
 Scribe asynchronously replicates Kubernetes persistent volumes between clusters
-using either rsync or rclone depending on the number of destinations.
+using either rsync or [rclone](https://rclone.org/) depending on the number of destinations.
 
 [![Documentation
 Status](https://readthedocs.org/projects/scribe-replication/badge/?version=latest)](https://scribe-replication.readthedocs.io/en/latest/?badge=latest)
