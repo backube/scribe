@@ -206,3 +206,18 @@ HELM=$(GOBIN)/helm
 else
 HELM=$(shell which helm)
 endif
+
+# Generate package manifests.
+.PHONY: packagemanifests
+packagemanifests: kustomize manifests
+	operator-sdk generate kustomize manifests -q
+	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMAGE)
+	$(KUSTOMIZE) build config/manifests | operator-sdk generate packagemanifests -q --version 0.1.0 --verbose
+
+.PHONY: cleanup-operator
+cleanup-operator:
+	operator-sdk cleanup scribe
+
+.PHONY: run-operator
+run-operator:
+	operator-sdk run packagemanifests --version ${OPERATOR_VERSION}
