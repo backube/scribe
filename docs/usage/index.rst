@@ -8,6 +8,7 @@ Usage
    metrics/index
    rclone/index
    rsync/index
+   restic/index
 
 There are two different replication methods built into Scribe. Choose the method that best fits your use-case:
 
