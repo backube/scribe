@@ -122,6 +122,33 @@ type ReplicationSourceRcloneSpec struct {
 	RcloneConfig *string `json:"rcloneConfig,omitempty"`
 }
 
+// ResticRetainPolicy defines the feilds for Restic backup
+type ResticRetainPolicy struct {
+	// Last defines the last n snapshts to be kept
+	Last *string `json:"last,omitempty"`
+	// Hourly defines the number of snapshots to be kept hourly
+	Hourly *int32 `json:"port,omitempty"`
+	// Daily defines the number of snapshots to be kept daily
+	Daily *int32 `json:"daily,omitempty"`
+	// Weekly defines the number of snapshots to be kept weekly
+	Weekly *int32 `json:"weekly,omitempty"`
+	// Monthly defines the number of snapshots to be kept monthly
+	Monthly *int32 `json:"monthly,omitempty"`
+	// Yearly defines the number of snapshots to be kept yearly
+	Yearly *int32 `json:"yearly,omitempty"`
+	// Within defines the number of snapshots to be kept within the given interval
+	Within *string `json:"within,omitempty"`
+}
+
+// ReplicationSourceResticSpec defines the field for restic in replicationSource.
+type ReplicationSourceResticSpec struct {
+	ReplicationSourceVolumeOptions `json:",inline"`
+	// PrueIntervalDays define how often to prune the repository
+	PrueIntervalDays *string `json:"prueIntervalDays,omitempty"`
+	// Repository is the secret name containing repository info
+	Repository *string `json:"repository,omitempty"`
+}
+
 // ReplicationSourceSpec defines the desired state of ReplicationSource
 type ReplicationSourceSpec struct {
 	// sourcePVC is the name of the PersistentVolumeClaim (PVC) to replicate.
@@ -136,6 +163,9 @@ type ReplicationSourceSpec struct {
 	// rclone defines the configuration when using Rclone-based replication.
 	//+optional
 	Rclone *ReplicationSourceRcloneSpec `json:"rclone,omitempty"`
+	// restic defines the configuration when using Restic-based replication.
+	//+optional
+	Restic *ReplicationSourceResticSpec `json:"restic,omitempty"`
 	// external defines the configuration when using an external replication
 	// provider.
 	//+optional

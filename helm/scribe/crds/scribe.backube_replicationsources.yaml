@@ -119,6 +119,50 @@ spec:
                       VSC is used.
                     type: string
                 type: object
+              restic:
+                description: restic defines the configuration when using Restic-based
+                  replication.
+                properties:
+                  accessModes:
+                    description: accessModes can be used to override the accessModes
+                      of the PiT image.
+                    items:
+                      type: string
+                    minItems: 1
+                    type: array
+                  capacity:
+                    anyOf:
+                    - type: integer
+                    - type: string
+                    description: capacity can be used to override the capacity of
+                      the PiT image.
+                    pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                    x-kubernetes-int-or-string: true
+                  copyMethod:
+                    description: copyMethod describes how a point-in-time (PiT) image
+                      of the source volume should be created.
+                    enum:
+                    - None
+                    - Clone
+                    - Snapshot
+                    type: string
+                  prueIntervalDays:
+                    description: PrueIntervalDays define how often to prune the repository
+                    type: string
+                  repository:
+                    description: Repository is the secret name containing repository
+                      info
+                    type: string
+                  storageClassName:
+                    description: storageClassName can be used to override the StorageClass
+                      of the PiT image.
+                    type: string
+                  volumeSnapshotClassName:
+                    description: volumeSnapshotClassName can be used to specify the
+                      VSC to be used if copyMethod is Snapshot. If not set, the default
+                      VSC is used.
+                    type: string
+                type: object
               rsync:
                 description: rsync defines the configuration when using Rsync-based
                   replication.
