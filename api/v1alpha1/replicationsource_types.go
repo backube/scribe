@@ -125,9 +125,9 @@ type ReplicationSourceRcloneSpec struct {
 // ResticRetainPolicy defines the feilds for Restic backup
 type ResticRetainPolicy struct {
 	// Last defines the last n snapshts to be kept
-	Last *string `json:"last,omitempty"`
+	Last *int32 `json:"last,omitempty"`
 	// Hourly defines the number of snapshots to be kept hourly
-	Hourly *int32 `json:"port,omitempty"`
+	Hourly *int32 `json:"hourly,omitempty"`
 	// Daily defines the number of snapshots to be kept daily
 	Daily *int32 `json:"daily,omitempty"`
 	// Weekly defines the number of snapshots to be kept weekly
@@ -143,10 +143,12 @@ type ResticRetainPolicy struct {
 // ReplicationSourceResticSpec defines the field for restic in replicationSource.
 type ReplicationSourceResticSpec struct {
 	ReplicationSourceVolumeOptions `json:",inline"`
-	// PrueIntervalDays define how often to prune the repository
-	PrueIntervalDays *string `json:"prueIntervalDays,omitempty"`
+	// PruneIntervalDays define how often to prune the repository
+	PruneIntervalDays *int32 `json:"pruneIntervalDays,omitempty"`
 	// Repository is the secret name containing repository info
 	Repository *string `json:"repository,omitempty"`
+	// ResticRetainPolicy define the retain policy
+	Retain *ResticRetainPolicy `json:"retain,omitempty"`
 }
 
 // ReplicationSourceSpec defines the desired state of ReplicationSource
@@ -215,6 +217,9 @@ type ReplicationSourceStatus struct {
 	// conditions represent the latest available observations of the
 	// source's state.
 	Conditions status.Conditions `json:"conditions,omitempty"`
+	// lastPruned in the object holding the time of last pruned
+	//+optional
+	LastPruned *v1.TypedLocalObjectReference `json:"latestImage,omitempty"`
 }
 
 // ReplicationSource defines the source for a replicated volume
