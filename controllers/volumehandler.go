@@ -264,12 +264,13 @@ func (h *destinationVolumeHandler) PreserveImage(l logr.Logger) (bool, error) {
 
 type sourceVolumeHandler struct {
 	ReplicationSourceReconciler
-	Ctx      context.Context
-	Instance *scribev1alpha1.ReplicationSource
-	Options  *scribev1alpha1.ReplicationSourceVolumeOptions
-	srcPVC   *v1.PersistentVolumeClaim
-	srcSnap  *snapv1.VolumeSnapshot
-	PVC      *v1.PersistentVolumeClaim
+	Ctx         context.Context
+	Instance    *scribev1alpha1.ReplicationSource
+	Options     *scribev1alpha1.ReplicationSourceVolumeOptions
+	srcPVC      *v1.PersistentVolumeClaim
+	srcSnap     *snapv1.VolumeSnapshot
+	PVC         *v1.PersistentVolumeClaim
+	resticCache *v1.PersistentVolumeClaim
 }
 
 // Cleans up the temporary PVC (and optional snapshot) after the synchronization
@@ -365,6 +366,51 @@ func (h *sourceVolumeHandler) pvcFromSnap(l logr.Logger) (bool, error) {
 		return false, err
 	}
 	logger.V(1).Info("pvc from snap reconciled", "operation", op)
+	return true, nil
+}
+
+func (h *sourceVolumeHandler) pvcForCache(l logr.Logger) (bool, error) {
+	h.resticCache = &v1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "restic-cache",
+			Namespace: h.Instance.Namespace,
+		},
+	}
+	logger := l.WithValues("pvc", nameFor(h.resticCache))
+	op, err := ctrlutil.CreateOrUpdate(h.Ctx, h.Client, h.resticCache, func() error {
+		if err := ctrl.SetControllerReference(h.Instance, h.resticCache, h.Scheme); err != nil {
+			logger.Error(err, "Unable to set controller refrenece")
+			return err
+		}
+		if h.resticCache.CreationTimestamp.IsZero() {
+			if h.Options.Capacity != nil {
+				h.resticCache.Spec.Resources.Requests = corev1.ResourceList{
+					corev1.ResourceStorage: *h.Options.Capacity,
+				}
+			} else {
+				h.resticCache.Spec.Resources.Requests = corev1.ResourceList{
+					corev1.ResourceStorage: *h.srcPVC.Spec.Resources.Requests.Storage(),
+				}
+			}
+			if h.Options.StorageClassName != nil {
+				h.resticCache.Spec.StorageClassName = h.Options.StorageClassName
+			} else {
+				h.resticCache.Spec.StorageClassName = h.srcPVC.Spec.StorageClassName
+			}
+			if h.Options.AccessModes != nil {
+				h.resticCache.Spec.AccessModes = h.Options.AccessModes
+			} else {
+				h.resticCache.Spec.AccessModes = h.srcPVC.Spec.AccessModes
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		logger.Error(err, "reconcile failed")
+		return false, err
+	}
+	logger.V(1).Info("restic cache pvc reconciled", "operation", op)
+
 	return true, nil
 }
 
