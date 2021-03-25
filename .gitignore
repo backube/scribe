@@ -27,5 +27,8 @@ bin
 *.swo
 *~
 
+#Scribe related
 # Secret files to prevent accidental commit of keys
 examples/rclone.conf
+test-kuttl/e2e/simple-rclone/rclone.conf
+test-kuttl/kubeconfig
