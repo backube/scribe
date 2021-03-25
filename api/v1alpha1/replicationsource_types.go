@@ -122,35 +122,6 @@ type ReplicationSourceRcloneSpec struct {
 	RcloneConfig *string `json:"rcloneConfig,omitempty"`
 }
 
-// ResticRetainPolicy defines the feilds for Restic backup
-type ResticRetainPolicy struct {
-	// Last defines the last n snapshts to be kept
-	Last *int32 `json:"last,omitempty"`
-	// Hourly defines the number of snapshots to be kept hourly
-	Hourly *int32 `json:"hourly,omitempty"`
-	// Daily defines the number of snapshots to be kept daily
-	Daily *int32 `json:"daily,omitempty"`
-	// Weekly defines the number of snapshots to be kept weekly
-	Weekly *int32 `json:"weekly,omitempty"`
-	// Monthly defines the number of snapshots to be kept monthly
-	Monthly *int32 `json:"monthly,omitempty"`
-	// Yearly defines the number of snapshots to be kept yearly
-	Yearly *int32 `json:"yearly,omitempty"`
-	// Within defines the number of snapshots to be kept within the given interval
-	Within *string `json:"within,omitempty"`
-}
-
-// ReplicationSourceResticSpec defines the field for restic in replicationSource.
-type ReplicationSourceResticSpec struct {
-	ReplicationSourceVolumeOptions `json:",inline"`
-	// PruneIntervalDays define how often to prune the repository
-	PruneIntervalDays *int32 `json:"pruneIntervalDays,omitempty"`
-	// Repository is the secret name containing repository info
-	Repository *string `json:"repository,omitempty"`
-	// ResticRetainPolicy define the retain policy
-	Retain *ResticRetainPolicy `json:"retain,omitempty"`
-}
-
 // ReplicationSourceSpec defines the desired state of ReplicationSource
 type ReplicationSourceSpec struct {
 	// sourcePVC is the name of the PersistentVolumeClaim (PVC) to replicate.
@@ -165,9 +136,6 @@ type ReplicationSourceSpec struct {
 	// rclone defines the configuration when using Rclone-based replication.
 	//+optional
 	Rclone *ReplicationSourceRcloneSpec `json:"rclone,omitempty"`
-	// restic defines the configuration when using Restic-based replication.
-	//+optional
-	Restic *ReplicationSourceResticSpec `json:"restic,omitempty"`
 	// external defines the configuration when using an external replication
 	// provider.
 	//+optional
@@ -217,9 +185,6 @@ type ReplicationSourceStatus struct {
 	// conditions represent the latest available observations of the
 	// source's state.
 	Conditions status.Conditions `json:"conditions,omitempty"`
-	// lastPruned in the object holding the time of last pruned
-	//+optional
-	LastPruned *v1.TypedLocalObjectReference `json:"latestImage,omitempty"`
 }
 
 // ReplicationSource defines the source for a replicated volume

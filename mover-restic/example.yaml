@@ -103,4 +103,4 @@ spec:
         - name: data
           persistentVolumeClaim:
             # PVC name taken from user CR
-            claimName: mysql-pv-claim
+            claimName: datavol
