@@ -356,6 +356,12 @@ func RunResticSrcReconciler(ctx context.Context, instance *scribev1alpha1.Replic
 			ReplicationSourceReconciler: *sr,
 			Options:                     &instance.Spec.Restic.ReplicationSourceVolumeOptions,
 		},
+		scribeMetrics: newScribeMetrics(prometheus.Labels{
+			"obj_name":      instance.Name,
+			"obj_namespace": instance.Namespace,
+			"role":          "source",
+			"method":        "restic",
+		}),
 	}
 	l := logger.WithValues("method", "Restic")
 	//Wrap the scheduling functions as reconcileFuncs
