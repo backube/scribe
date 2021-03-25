@@ -69,7 +69,7 @@ function do_restore {
     restic restore -t . --host "${RESTIC_HOST}" latest
     popd
 }
-echo "Testing mandatory env var"
+echo "Testing mandatory env variables"
 # Check the mandatory env variables
 for var in RESTIC_CACHE_DIR \
            RESTIC_PASSWORD \
