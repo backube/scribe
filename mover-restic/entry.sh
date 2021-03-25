@@ -3,9 +3,8 @@
 set -e -o pipefail
 
 echo "Scribe restic container version: ${version:-unknown}"
+
 echo  "$@"
-
-
 # Force the associated backup host name to be "scribe"
 RESTIC_HOST="scribe"
 # Make restic output progress reports every 10s

@@ -402,7 +402,6 @@ func (h *sourceVolumeHandler) pvcForCache(l logr.Logger) (bool, error) {
 			} else {
 				h.resticCache.Spec.AccessModes = h.srcPVC.Spec.AccessModes
 			}
-
 		}
 		return nil
 	})

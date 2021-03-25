@@ -370,11 +370,10 @@ func RunResticSrcReconciler(ctx context.Context, instance *scribev1alpha1.Replic
 		r.ensureServiceAccount,
 		r.ensureRepository,
 		r.ensureJob,
-		// r.cleanupJob,
-		// r.CleanupPVC,
+		r.cleanupJob,
+		r.CleanupPVC,
 	)
 	return ctrl.Result{}, err
-
 }
 
 //nolint:funlen
@@ -490,18 +489,17 @@ func (r *resticSrcReconciler) ensureJob(l logr.Logger) (bool, error) {
 		if len(r.job.Spec.Template.Spec.Containers) != 1 {
 			r.job.Spec.Template.Spec.Containers = []corev1.Container{{}}
 		}
-
-		r.job.Spec.Template.Spec.Containers[0].Name = "restic"
+		r.job.Spec.Template.Spec.Containers[0].Name = "restic-backup"
 		// calculate retention policy. for now setting FORGET_OPTIONS in
 		// env variables directly. It has to be calculated from retention
 		// policy
-
 		// get secret from cluster
 		foundSecret := &corev1.Secret{}
-		err := r.Client.Get(context.TODO(), types.NamespacedName{Name: resticSecret, Namespace: r.Instance.Namespace}, foundSecret)
+		err := r.Client.Get(context.TODO(),
+			types.NamespacedName{
+				Name: resticSecretName, Namespace: r.Instance.Namespace}, foundSecret)
 		if err == nil {
-			dataMap := *&foundSecret.Data
-			logger.Info("-------------- restic sescert-------", "dataMap", string(dataMap["RESTIC_REPOSITORY"]))
+			dataMap := foundSecret.Data
 			r.job.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
 				{Name: "FORGET_OPTIONS", Value: "--keep-hourly 2 --keep-daily 1"},
 				{Name: "DATA_DIR", Value: mountPath},
@@ -511,16 +509,13 @@ func (r *resticSrcReconciler) ensureJob(l logr.Logger) (bool, error) {
 				{Name: "AWS_ACCESS_KEY_ID", Value: string(dataMap["AWS_ACCESS_KEY_ID"])},
 				{Name: "AWS_SECRET_ACCESS_KEY", Value: string(dataMap["AWS_SECRET_ACCESS_KEY"])},
 			}
-
 		} else {
-			logger.Error(err, "Loading env variables to Job failed")
+			logger.Error(err, "restic-config secret not fund.Env variables not set.")
 			return err
-
 		}
-
-		r.job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/bash", "-c", "./entry.sh"}
+		r.job.Spec.Template.Spec.Containers[0].Command = []string{"./entry.sh"}
 		r.job.Spec.Template.Spec.Containers[0].Args = []string{"backup"}
-		r.job.Spec.Template.Spec.Containers[0].Image = "quay.io/husky_parul/scribe-mover-restic:latest"
+		r.job.Spec.Template.Spec.Containers[0].Image = ResticContainerImage
 		runAsUser := int64(0)
 		r.job.Spec.Template.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
 			RunAsUser: &runAsUser,
@@ -531,7 +526,6 @@ func (r *resticSrcReconciler) ensureJob(l logr.Logger) (bool, error) {
 		}
 		r.job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
 		r.job.Spec.Template.Spec.ServiceAccountName = r.serviceAccount.Name
-		// secretMode := int32(0600)
 		r.job.Spec.Template.Spec.Volumes = []corev1.Volume{
 			{Name: dataVolumeName, VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
@@ -879,6 +873,7 @@ func (r *rsyncSrcReconciler) cleanupJob(l logr.Logger) (bool, error) {
 	return true, nil
 }
 
+//nolint:dupl
 func (r *rcloneSrcReconciler) cleanupJob(l logr.Logger) (bool, error) {
 	logger := l.WithValues("job", r.job)
 	// update time/duration
@@ -901,6 +896,7 @@ func (r *rcloneSrcReconciler) cleanupJob(l logr.Logger) (bool, error) {
 	return true, nil
 }
 
+//nolint:dupl
 func (r *resticSrcReconciler) cleanupJob(l logr.Logger) (bool, error) {
 	logger := l.WithValues("job", r.job)
 	// update time/duration
