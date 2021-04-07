@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: livmig-testapp-git
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: testapp-git
+  namespace: livmig-testapp-git
+  labels:
+    app: testapp-git
+spec:
+  ports:
+    - port: 8080
+      name: http
+  selector:
+    app: testapp-git
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: testapp-git
+  namespace: livmig-testapp-git
+  labels:
+    app: testapp-git
+spec:
+  replicas: 1
+  serviceName: testapp-git
+  selector:
+    matchLabels:
+      app: testapp-git
+  template:
+    metadata:
+      labels:
+        app: testapp-git
+    spec:
+      containers:
+        - name: testapp-git
+          image: guymguym/livmig-testapp-git
+          imagePullPolicy: IfNotPresent
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh","-c","touch /pre-stop-start; while ! [ -f /pre-stop-done ]; do sleep 1; done"]
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: APP_TYPE
+              value: notmini
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "100Mi"
+            limits:
+              cpu: "10"
+              memory: "10Gi"
+          volumeMounts:
+            - name: podinfo
+              mountPath: /app/podinfo
+            - name: verify
+              mountPath: /app/verify
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: podinfo
+          downwardAPI:
+            items:
+              - path: uid
+                fieldRef:
+                  fieldPath: metadata.uid
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: portworx-csi-sc
+        resources:
+          requests:
+            storage: 1Gi
+    - metadata:
+        name: verify
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: gp2
+        resources:
+          requests:
+            storage: 1Gi
