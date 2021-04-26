@@ -844,7 +844,6 @@ func (r *resticSrcReconciler) ensureServiceAccount(l logr.Logger) (bool, error) 
 	return saDesc.Reconcile(l)
 }
 
-//nolint:funlen
 func (r *rsyncSrcReconciler) ensureJob(l logr.Logger) (bool, error) {
 	r.job = &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -854,95 +853,31 @@ func (r *rsyncSrcReconciler) ensureJob(l logr.Logger) (bool, error) {
 	}
 	logger := l.WithValues("job", nameFor(r.job))
 
-	op, err := ctrlutil.CreateOrUpdate(r.Ctx, r.Client, r.job, func() error {
-		if err := ctrl.SetControllerReference(r.Instance, r.job, r.Scheme); err != nil {
-			logger.Error(err, "unable to set controller reference")
-			return err
-		}
-		r.job.Spec.Template.ObjectMeta.Name = r.job.Name
-		if r.job.Spec.Template.ObjectMeta.Labels == nil {
-			r.job.Spec.Template.ObjectMeta.Labels = map[string]string{}
-		}
-		for k, v := range r.serviceSelector() {
-			r.job.Spec.Template.ObjectMeta.Labels[k] = v
-		}
-		backoffLimit := int32(2)
-		r.job.Spec.BackoffLimit = &backoffLimit
-		if r.Instance.Spec.Paused {
-			parallelism := int32(0)
-			r.job.Spec.Parallelism = &parallelism
-		} else {
-			parallelism := int32(1)
-			r.job.Spec.Parallelism = &parallelism
-		}
-		if len(r.job.Spec.Template.Spec.Containers) != 1 {
-			r.job.Spec.Template.Spec.Containers = []corev1.Container{{}}
-		}
-		r.job.Spec.Template.Spec.Containers[0].Name = "rsync"
-		if r.Instance.Spec.Rsync.Port != nil && r.Instance.Spec.Rsync.Address != nil {
-			connectPort := strconv.Itoa(int(*r.Instance.Spec.Rsync.Port))
-			r.job.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
-				{Name: "DESTINATION_ADDRESS", Value: *r.Instance.Spec.Rsync.Address},
-				{Name: "DESTINATION_PORT", Value: connectPort},
-			}
-		} else if r.Instance.Spec.Rsync.Port == nil && r.Instance.Spec.Rsync.Address != nil {
-			r.job.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
-				{Name: "DESTINATION_ADDRESS", Value: *r.Instance.Spec.Rsync.Address},
-			}
-		} else if r.Instance.Spec.Rsync.Address == nil {
-			r.job.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{}
-		}
-		r.job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/bash", "-c", "/source.sh"}
-		r.job.Spec.Template.Spec.Containers[0].Image = RsyncContainerImage
-		runAsUser := int64(0)
-		r.job.Spec.Template.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
-			Capabilities: &corev1.Capabilities{
-				Add: []corev1.Capability{
-					"AUDIT_WRITE",
-					"SYS_CHROOT",
-				},
-			},
-			RunAsUser: &runAsUser,
-		}
-		r.job.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
-			{Name: dataVolumeName, MountPath: mountPath},
-			{Name: "keys", MountPath: "/keys"},
-		}
-		r.job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
-		r.job.Spec.Template.Spec.ServiceAccountName = r.serviceAccount.Name
-		secretMode := int32(0600)
-		r.job.Spec.Template.Spec.Volumes = []corev1.Volume{
-			{Name: dataVolumeName, VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: r.PVC.Name,
-				}},
-			},
-			{Name: "keys", VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName:  r.srcSecret.Name,
-					DefaultMode: &secretMode,
-				}},
-			},
-		}
-		logger.V(1).Info("Job has PVC", "PVC", r.PVC, "DS", r.PVC.Spec.DataSource)
-		return nil
-	})
-
-	// If Job had failed, delete it so it can be recreated
-	if r.job.Status.Failed >= *r.job.Spec.BackoffLimit {
-		logger.Info("deleting job -- backoff limit reached")
-		err = r.Client.Delete(r.Ctx, r.job, client.PropagationPolicy(metav1.DeletePropagationBackground))
-		return false, err
+	labels := r.serviceSelector()
+	env := []corev1.EnvVar{}
+	if r.Instance.Spec.Rsync.Address != nil {
+		env = append(env, corev1.EnvVar{
+			Name:  "DESTINATION_ADDRESS",
+			Value: *r.Instance.Spec.Rsync.Address,
+		})
 	}
-
-	if err != nil {
-		logger.Error(err, "reconcile failed")
-	} else {
-		logger.V(1).Info("Job reconciled", "operation", op)
+	if r.Instance.Spec.Rsync.Port != nil {
+		env = append(env, corev1.EnvVar{
+			Name:  "DESTINATION_PORT",
+			Value: strconv.Itoa(int(*r.Instance.Spec.Rsync.Port)),
+		})
 	}
+	command := []string{"/bin/bash", "-c", "/source.sh"}
+	dataPVCName := r.PVC.Name
+	sshSecretName := r.srcSecret.Name
 
-	// We only continue reconciling if the rsync job has completed
-	return r.job.Status.Succeeded == 1, nil
+	cont, err := createOrUpdateJobRsync(r.Ctx, logger, r.Client, r.job,
+		r.Instance, r.Scheme, labels, env, command, dataPVCName, sshSecretName,
+		r.Instance.Spec.Paused, r.serviceAccount.Name)
+
+	// Only continue reconciling if cou says it's ok AND the job has succeeded
+	// (sync finished).
+	return cont && r.job.Status.Succeeded == 1, err
 }
 
 //nolint:dupl

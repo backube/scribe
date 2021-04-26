@@ -746,97 +746,28 @@ func (r *rcloneDestReconciler) ensureServiceAccount(l logr.Logger) (bool, error)
 	return saDesc.Reconcile(l)
 }
 
-//nolint:funlen
 func (r *rsyncDestReconciler) ensureJob(l logr.Logger) (bool, error) {
-	jobName := types.NamespacedName{
-		Name:      "scribe-rsync-dest-" + r.Instance.Name,
-		Namespace: r.Instance.Namespace,
-	}
-	logger := l.WithValues("job", jobName)
-
 	r.job = &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      jobName.Name,
-			Namespace: jobName.Namespace,
+			Name:      "scribe-rsync-dest-" + r.Instance.Name,
+			Namespace: r.Instance.Namespace,
 		},
 	}
+	logger := l.WithValues("job", nameFor(r.job))
 
-	op, err := ctrlutil.CreateOrUpdate(r.Ctx, r.Client, r.job, func() error {
-		if err := ctrl.SetControllerReference(r.Instance, r.job, r.Scheme); err != nil {
-			logger.Error(err, "unable to set controller reference")
-			return err
-		}
-		r.job.Spec.Template.ObjectMeta.Name = jobName.Name
-		if r.job.Spec.Template.ObjectMeta.Labels == nil {
-			r.job.Spec.Template.ObjectMeta.Labels = map[string]string{}
-		}
-		for k, v := range r.serviceSelector() {
-			r.job.Spec.Template.ObjectMeta.Labels[k] = v
-		}
-		backoffLimit := int32(2)
-		r.job.Spec.BackoffLimit = &backoffLimit
-		if r.Instance.Spec.Paused {
-			parallelism := int32(0)
-			r.job.Spec.Parallelism = &parallelism
-		} else {
-			parallelism := int32(1)
-			r.job.Spec.Parallelism = &parallelism
-		}
-		if len(r.job.Spec.Template.Spec.Containers) != 1 {
-			r.job.Spec.Template.Spec.Containers = []corev1.Container{{}}
-		}
-		r.job.Spec.Template.Spec.Containers[0].Name = "rsync"
-		r.job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/bash", "-c", "/destination.sh"}
-		r.job.Spec.Template.Spec.Containers[0].Image = RsyncContainerImage
-		runAsUser := int64(0)
-		r.job.Spec.Template.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
-			Capabilities: &corev1.Capabilities{
-				Add: []corev1.Capability{
-					"AUDIT_WRITE",
-					"SYS_CHROOT",
-				},
-			},
-			RunAsUser: &runAsUser,
-		}
-		r.job.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
-			{Name: dataVolumeName, MountPath: mountPath},
-			{Name: "keys", MountPath: "/keys"},
-		}
-		r.job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
-		r.job.Spec.Template.Spec.ServiceAccountName = r.serviceAccount.Name
-		secretMode := int32(0600)
-		r.job.Spec.Template.Spec.Volumes = []corev1.Volume{
-			{Name: dataVolumeName, VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: r.PVC.Name,
-					ReadOnly:  false,
-				}},
-			},
-			{Name: "keys", VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName:  r.destSecret.Name,
-					DefaultMode: &secretMode,
-				}},
-			},
-		}
-		return nil
-	})
+	labels := r.serviceSelector()
+	env := []corev1.EnvVar{}
+	command := []string{"/bin/bash", "-c", "/destination.sh"}
+	dataPVCName := r.PVC.Name
+	sshSecretName := r.destSecret.Name
 
-	// If Job had failed, delete it so it can be recreated
-	if r.job.Status.Failed >= *r.job.Spec.BackoffLimit {
-		logger.Info("deleting job -- backoff limit reached")
-		err = r.Client.Delete(r.Ctx, r.job, client.PropagationPolicy(metav1.DeletePropagationBackground))
-		return false, err
-	}
+	cont, err := createOrUpdateJobRsync(r.Ctx, logger, r.Client, r.job,
+		r.Instance, r.Scheme, labels, env, command, dataPVCName, sshSecretName,
+		r.Instance.Spec.Paused, r.serviceAccount.Name)
 
-	if err != nil {
-		logger.Error(err, "reconcile failed")
-	} else {
-		logger.V(1).Info("Job reconciled", "operation", op)
-	}
-
-	// We only continue reconciling if the rsync job has completed
-	return r.job.Status.Succeeded == 1, nil
+	// Only continue reconciling if cou says it's ok AND the job has succeeded
+	// (sync finished).
+	return cont && r.job.Status.Succeeded == 1, err
 }
 
 //nolint:funlen
