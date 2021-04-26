@@ -770,7 +770,7 @@ func (r *rsyncDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 	return cont && r.job.Status.Succeeded == 1, err
 }
 
-//nolint:funlen
+//nolint:dupl
 func (r *rcloneDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 	r.job = &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -779,80 +779,21 @@ func (r *rcloneDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 		},
 	}
 	logger := l.WithValues("job", nameFor(r.job))
-	op, err := ctrlutil.CreateOrUpdate(r.Ctx, r.Client, r.job, func() error {
-		if err := ctrl.SetControllerReference(r.Instance, r.job, r.Scheme); err != nil {
-			logger.Error(err, "unable to set controller reference")
-			return err
-		}
-		r.job.Spec.Template.ObjectMeta.Name = r.job.Name
-		if r.job.Spec.Template.ObjectMeta.Labels == nil {
-			r.job.Spec.Template.ObjectMeta.Labels = map[string]string{}
-		}
-		backoffLimit := int32(2)
-		r.job.Spec.BackoffLimit = &backoffLimit
-		if r.Instance.Spec.Paused {
-			parallelism := int32(0)
-			r.job.Spec.Parallelism = &parallelism
-		} else {
-			parallelism := int32(1)
-			r.job.Spec.Parallelism = &parallelism
-		}
-		if len(r.job.Spec.Template.Spec.Containers) != 1 {
-			r.job.Spec.Template.Spec.Containers = []corev1.Container{{}}
-		}
 
-		r.job.Spec.Template.Spec.Containers[0].Name = "rclone"
-		r.job.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
-			{Name: "RCLONE_CONFIG", Value: "/rclone-config/rclone.conf"},
-			{Name: "RCLONE_DEST_PATH", Value: *r.Instance.Spec.Rclone.RcloneDestPath},
-			{Name: "DIRECTION", Value: "destination"},
-			{Name: "MOUNT_PATH", Value: mountPath},
-			{Name: "RCLONE_CONFIG_SECTION", Value: *r.Instance.Spec.Rclone.RcloneConfigSection},
-		}
-		r.job.Spec.Template.Spec.Containers[0].Command = []string{"/bin/bash", "-c", "./active.sh"}
-		r.job.Spec.Template.Spec.Containers[0].Image = RcloneContainerImage
-		runAsUser := int64(0)
-		r.job.Spec.Template.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
-			RunAsUser: &runAsUser,
-		}
-		r.job.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
-			{Name: dataVolumeName, MountPath: mountPath},
-			{Name: rcloneSecret, MountPath: "/rclone-config/"},
-		}
-		r.job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
-		r.job.Spec.Template.Spec.ServiceAccountName = r.serviceAccount.Name
-		secretMode := int32(0600)
-		r.job.Spec.Template.Spec.Volumes = []corev1.Volume{
-			{Name: dataVolumeName, VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: r.PVC.Name,
-					ReadOnly:  false,
-				}},
-			},
-			{Name: rcloneSecret, VolumeSource: corev1.VolumeSource{
-				Secret: &corev1.SecretVolumeSource{
-					SecretName:  r.rcloneConfigSecret.Name,
-					DefaultMode: &secretMode,
-				}},
-			},
-		}
-		logger.V(1).Info("Job has PVC", "PVC", r.PVC, "DS", r.PVC.Spec.DataSource)
-		return nil
-	})
+	destPath := *r.Instance.Spec.Rclone.RcloneDestPath
+	direction := "destination"
+	configSection := *r.Instance.Spec.Rclone.RcloneConfigSection
+	dataPVCName := r.PVC.Name
+	rcloneSecretName := r.rcloneConfigSecret.Name
 
-	// If Job had failed, delete it so it can be recreated
-	if r.job.Status.Failed >= *r.job.Spec.BackoffLimit {
-		logger.Info("deleting job -- backoff limit reached")
-		err = r.Client.Delete(r.Ctx, r.job, client.PropagationPolicy(metav1.DeletePropagationBackground))
-		return false, err
-	}
-	if err != nil {
-		logger.Error(err, "reconcile failed")
-	} else {
-		logger.V(1).Info("Job reconciled", "operation", op)
-	}
-	// We only continue reconciling if the rsync job has completed
-	return r.job.Status.Succeeded == 1, nil
+	cont, err := createOrUpdateJobRclone(r.Ctx, logger, r.Client, r.job,
+		r.Instance, r.Scheme, dataPVCName, rcloneSecretName, destPath,
+		direction, configSection, r.Instance.Spec.Paused,
+		r.serviceAccount.Name)
+
+	// Only continue reconciling if cou says it's ok AND the job has succeeded
+	// (sync finished).
+	return cont && r.job.Status.Succeeded == 1, err
 }
 
 //nolint:dupl

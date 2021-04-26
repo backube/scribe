@@ -30,6 +30,61 @@ import (
 	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+func createOrUpdateJobRclone(ctx context.Context,
+	l logr.Logger,
+	c client.Client,
+	job *batchv1.Job,
+	owner metav1.Object,
+	scheme *runtime.Scheme,
+	dataPVCName string,
+	rcloneSecretName string,
+	destPath string,
+	direction string,
+	configSection string,
+	paused bool,
+	saName string) (bool, error) {
+	env := []corev1.EnvVar{
+		{Name: "RCLONE_DEST_PATH", Value: destPath},
+		{Name: "DIRECTION", Value: direction},
+		{Name: "RCLONE_CONFIG", Value: "/rclone-config/rclone.conf"},
+		{Name: "RCLONE_CONFIG_SECTION", Value: configSection},
+		{Name: "MOUNT_PATH", Value: mountPath},
+	}
+
+	runAsUser := int64(0)
+	containers := []corev1.Container{{
+		Name:    "rclone",
+		Env:     env,
+		Command: []string{"/bin/bash", "-c", "./active.sh"},
+		Image:   RcloneContainerImage,
+		SecurityContext: &corev1.SecurityContext{
+			RunAsUser: &runAsUser,
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{Name: dataVolumeName, MountPath: mountPath},
+			{Name: rcloneSecret, MountPath: "/rclone-config"},
+		},
+	}}
+	secretMode := int32(0600)
+	volumes := []corev1.Volume{
+		{Name: dataVolumeName, VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: dataPVCName,
+			}},
+		},
+		{Name: rcloneSecret, VolumeSource: corev1.VolumeSource{
+			Secret: &corev1.SecretVolumeSource{
+				SecretName:  rcloneSecretName,
+				DefaultMode: &secretMode,
+			}},
+		},
+	}
+
+	labels := map[string]string{}
+	return createOrUpdateJob(ctx, l, c, job, owner,
+		scheme, labels, containers, volumes, paused, saName)
+}
+
 func createOrUpdateJobRsync(ctx context.Context,
 	l logr.Logger,
 	c client.Client,
