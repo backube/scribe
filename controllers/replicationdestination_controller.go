@@ -37,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	scribev1alpha1 "github.com/backube/scribe/api/v1alpha1"
 )
@@ -461,7 +460,6 @@ func (r *resticDestReconciler) ensureRepository(l logr.Logger) (bool, error) {
 	return true, nil
 }
 
-//nolint:dupl,funlen
 func (r *resticDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 	r.job = &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -470,116 +468,20 @@ func (r *resticDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 		},
 	}
 	logger := l.WithValues("job", nameFor(r.job))
-	op, err := ctrlutil.CreateOrUpdate(r.Ctx, r.Client, r.job, func() error {
-		if err := ctrl.SetControllerReference(r.Instance, r.job, r.Scheme); err != nil {
-			logger.Error(err, "unable to set controller reference")
-			return err
-		}
-		r.job.Spec.Template.ObjectMeta.Name = r.job.Name
-		if r.job.Spec.Template.ObjectMeta.Labels == nil {
-			r.job.Spec.Template.ObjectMeta.Labels = map[string]string{}
-		}
-		backoffLimit := int32(2)
-		r.job.Spec.BackoffLimit = &backoffLimit
-		if r.Instance.Spec.Paused {
-			parallelism := int32(0)
-			r.job.Spec.Parallelism = &parallelism
-		} else {
-			parallelism := int32(1)
-			r.job.Spec.Parallelism = &parallelism
-		}
-		if len(r.job.Spec.Template.Spec.Containers) != 1 {
-			r.job.Spec.Template.Spec.Containers = []corev1.Container{{}}
-		}
-		r.job.Spec.Template.Spec.Containers[0].Name = "restic-restore"
-		// calculate retention policy. for now setting FORGET_OPTIONS in
-		// env variables directly. It has to be calculated from retention
-		// policy
-		// get secret from cluster
-		var optionalFalse = false
-		r.job.Spec.Template.Spec.Containers[0].Env = []corev1.EnvVar{
-			{Name: "FORGET_OPTIONS", Value: "--keep-hourly 2 --keep-daily 1"},
-			{Name: "DATA_DIR", Value: mountPath},
-			{Name: "RESTIC_CACHE_DIR", Value: resticCacheMountPath},
-			{Name: "RESTIC_REPOSITORY", ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: r.resticRepositorySecret.Name,
-					},
-					Key:      "RESTIC_REPOSITORY",
-					Optional: &optionalFalse,
-				},
-			}},
-			{Name: "RESTIC_PASSWORD", ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: r.resticRepositorySecret.Name,
-					},
-					Key:      "RESTIC_PASSWORD",
-					Optional: &optionalFalse,
-				},
-			}},
-			{Name: "AWS_ACCESS_KEY_ID", ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: r.resticRepositorySecret.Name,
-					},
-					Key:      "AWS_ACCESS_KEY_ID",
-					Optional: &optionalFalse,
-				},
-			}},
-			{Name: "AWS_SECRET_ACCESS_KEY", ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: r.resticRepositorySecret.Name,
-					},
-					Key:      "AWS_SECRET_ACCESS_KEY",
-					Optional: &optionalFalse,
-				},
-			}},
-		}
 
-		r.job.Spec.Template.Spec.Containers[0].Command = []string{"/entry.sh"}
-		r.job.Spec.Template.Spec.Containers[0].Args = []string{"restore"}
-		r.job.Spec.Template.Spec.Containers[0].Image = ResticContainerImage
-		runAsUser := int64(0)
-		r.job.Spec.Template.Spec.Containers[0].SecurityContext = &corev1.SecurityContext{
-			RunAsUser: &runAsUser,
-		}
-		r.job.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{
-			{Name: dataVolumeName, MountPath: mountPath},
-			{Name: resticCache, MountPath: resticCacheMountPath},
-		}
-		r.job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
-		r.job.Spec.Template.Spec.ServiceAccountName = r.serviceAccount.Name
-		r.job.Spec.Template.Spec.Volumes = []corev1.Volume{
-			{Name: dataVolumeName, VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: r.PVC.Name,
-				}},
-			},
-			{Name: resticCache, VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: r.resticCache.Name,
-				}},
-			},
-		}
-		logger.V(1).Info("Job has PVC", "PVC", r.PVC, "DS", r.PVC.Spec.DataSource)
-		return nil
-	})
-	// If Job had failed, delete it so it can be recreated
-	if r.job.Status.Failed >= *r.job.Spec.BackoffLimit {
-		logger.Info("deleting job -- backoff limit reached")
-		err = r.Client.Delete(r.Ctx, r.job, client.PropagationPolicy(metav1.DeletePropagationBackground))
-		return false, err
-	}
-	if err != nil {
-		logger.Error(err, "reconcile failed")
-	} else {
-		logger.V(1).Info("Job reconciled", "operation", op)
-	}
-	// We only continue reconciling if the restic job has completed
-	return r.job.Status.Succeeded == 1, nil
+	forgetOptions := "" // forget isn't used on restore
+	resticSecretName := r.resticRepositorySecret.Name
+	actions := []string{"restore"}
+	dataPVCName := r.PVC.Name
+	cachePVCName := r.resticCache.Name
+
+	cont, err := createOrUpdateJobRestic(r.Ctx, logger, r.Client, r.job,
+		r.Instance, r.Scheme, dataPVCName, cachePVCName, resticSecretName,
+		forgetOptions, actions, r.Instance.Spec.Paused, r.serviceAccount.Name)
+
+	// Only continue reconciling if cou says it's ok AND the job has succeeded
+	// (sync finished).
+	return cont && r.job.Status.Succeeded == 1, err
 }
 
 //nolint:dupl

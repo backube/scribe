@@ -85,6 +85,77 @@ func createOrUpdateJobRclone(ctx context.Context,
 		scheme, labels, containers, volumes, paused, saName)
 }
 
+func envFromSecret(secretName string, field string, optional bool) corev1.EnvVar {
+	return corev1.EnvVar{
+		Name: field,
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: secretName,
+				},
+				Key:      field,
+				Optional: &optional,
+			},
+		},
+	}
+}
+
+func createOrUpdateJobRestic(ctx context.Context,
+	l logr.Logger,
+	c client.Client,
+	job *batchv1.Job,
+	owner metav1.Object,
+	scheme *runtime.Scheme,
+	dataPVCName string,
+	cachePVCName string,
+	resticSecretName string,
+	forgetOptions string,
+	actions []string,
+	paused bool,
+	saName string) (bool, error) {
+	env := []corev1.EnvVar{
+		{Name: "FORGET_OPTIONS", Value: forgetOptions},
+		{Name: "DATA_DIR", Value: mountPath},
+		{Name: "RESTIC_CACHE_DIR", Value: resticCacheMountPath},
+		envFromSecret(resticSecretName, "RESTIC_REPOSITORY", false),
+		envFromSecret(resticSecretName, "RESTIC_PASSWORD", false),
+		envFromSecret(resticSecretName, "AWS_ACCESS_KEY_ID", true),
+		envFromSecret(resticSecretName, "AWS_SECRET_ACCESS_KEY", true),
+	}
+
+	runAsUser := int64(0)
+	containers := []corev1.Container{{
+		Name:    "restic",
+		Env:     env,
+		Command: []string{"/entry.sh"},
+		Args:    actions,
+		Image:   ResticContainerImage,
+		SecurityContext: &corev1.SecurityContext{
+			RunAsUser: &runAsUser,
+		},
+		VolumeMounts: []corev1.VolumeMount{
+			{Name: dataVolumeName, MountPath: mountPath},
+			{Name: resticCache, MountPath: resticCacheMountPath},
+		},
+	}}
+	volumes := []corev1.Volume{
+		{Name: dataVolumeName, VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: dataPVCName,
+			}},
+		},
+		{Name: resticCache, VolumeSource: corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: cachePVCName,
+			}},
+		},
+	}
+
+	labels := map[string]string{}
+	return createOrUpdateJob(ctx, l, c, job, owner,
+		scheme, labels, containers, volumes, paused, saName)
+}
+
 func createOrUpdateJobRsync(ctx context.Context,
 	l logr.Logger,
 	c client.Client,
