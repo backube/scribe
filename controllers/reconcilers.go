@@ -100,6 +100,7 @@ func envFromSecret(secretName string, field string, optional bool) corev1.EnvVar
 	}
 }
 
+//nolint:funlen
 func createOrUpdateJobRestic(ctx context.Context,
 	l logr.Logger,
 	c client.Client,
@@ -117,10 +118,54 @@ func createOrUpdateJobRestic(ctx context.Context,
 		{Name: "FORGET_OPTIONS", Value: forgetOptions},
 		{Name: "DATA_DIR", Value: mountPath},
 		{Name: "RESTIC_CACHE_DIR", Value: resticCacheMountPath},
+		// We populate environment variables from the restic repo Secret. They
+		// are taken 1-for-1 from the Secret into env vars. The allowed
+		// variables are defined by restic.
+		// https://restic.readthedocs.io/en/stable/040_backup.html#environment-variables
+		// Mandatory variables are needed to define the repository location and
+		// its password.
 		envFromSecret(resticSecretName, "RESTIC_REPOSITORY", false),
 		envFromSecret(resticSecretName, "RESTIC_PASSWORD", false),
+
+		// Optional variables based on what backend is used for restic
 		envFromSecret(resticSecretName, "AWS_ACCESS_KEY_ID", true),
 		envFromSecret(resticSecretName, "AWS_SECRET_ACCESS_KEY", true),
+		envFromSecret(resticSecretName, "AWS_DEFAULT_REGION", true),
+
+		envFromSecret(resticSecretName, "ST_AUTH", true),
+		envFromSecret(resticSecretName, "ST_USER", true),
+		envFromSecret(resticSecretName, "ST_KEY", true),
+
+		envFromSecret(resticSecretName, "OS_AUTH_URL", true),
+		envFromSecret(resticSecretName, "OS_REGION_NAME", true),
+		envFromSecret(resticSecretName, "OS_USERNAME", true),
+		envFromSecret(resticSecretName, "OS_USER_ID", true),
+		envFromSecret(resticSecretName, "OS_PASSWORD", true),
+		envFromSecret(resticSecretName, "OS_TENANT_ID", true),
+		envFromSecret(resticSecretName, "OS_TENANT_NAME", true),
+
+		envFromSecret(resticSecretName, "OS_USER_DOMAIN_NAME", true),
+		envFromSecret(resticSecretName, "OS_USER_DOMAIN_ID", true),
+		envFromSecret(resticSecretName, "OS_PROJECT_NAME", true),
+		envFromSecret(resticSecretName, "OS_PROJECT_DOMAIN_NAME", true),
+		envFromSecret(resticSecretName, "OS_PROJECT_DOMAIN_ID", true),
+		envFromSecret(resticSecretName, "OS_TRUST_ID", true),
+
+		envFromSecret(resticSecretName, "OS_APPLICATION_CREDENTIAL_ID", true),
+		envFromSecret(resticSecretName, "OS_APPLICATION_CREDENTIAL_NAME", true),
+		envFromSecret(resticSecretName, "OS_APPLICATION_CREDENTIAL_SECRET", true),
+
+		envFromSecret(resticSecretName, "OS_STORAGE_URL", true),
+		envFromSecret(resticSecretName, "OS_AUTH_TOKEN", true),
+
+		envFromSecret(resticSecretName, "B2_ACCOUNT_ID", true),
+		envFromSecret(resticSecretName, "B2_ACCOUNT_KEY", true),
+
+		envFromSecret(resticSecretName, "AZURE_ACCOUNT_NAME", true),
+		envFromSecret(resticSecretName, "AZURE_ACCOUNT_KEY", true),
+
+		envFromSecret(resticSecretName, "GOOGLE_PROJECT_ID", true),
+		envFromSecret(resticSecretName, "GOOGLE_APPLICATION_CREDENTIALS", true),
 	}
 
 	runAsUser := int64(0)
