@@ -1,0 +1,13 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  # Timeout must be longer than sync interval in ReplicationSource
+  - timeout: 150
+    command: >-
+      ../../../bin/kubectl-scribe set-replication
+        --source-namespace ${NAMESPACE}
+        --source-replication-name source
+        --dest-namespace ${NAMESPACE}
+        --dest-replication-name dest
+        --dest-pvc data-dest
