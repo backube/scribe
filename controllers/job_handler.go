@@ -30,19 +30,23 @@ import (
 	ctrlutil "sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func createOrUpdateJobRclone(ctx context.Context,
-	l logr.Logger,
-	c client.Client,
-	job *batchv1.Job,
-	owner metav1.Object,
-	scheme *runtime.Scheme,
-	dataPVCName string,
+// jobOptions holds the common options across all the Job reconcile variations.
+type jobOptions struct {
+	ctx    context.Context
+	l      logr.Logger
+	c      client.Client
+	job    *batchv1.Job
+	owner  metav1.Object
+	scheme *runtime.Scheme
+	paused bool
+	saName string
+}
+
+func (o *jobOptions) reconcileRcloneJob(dataPVCName string,
 	rcloneSecretName string,
 	destPath string,
 	direction string,
-	configSection string,
-	paused bool,
-	saName string) (bool, error) {
+	configSection string) (bool, error) {
 	env := []corev1.EnvVar{
 		{Name: "RCLONE_DEST_PATH", Value: destPath},
 		{Name: "DIRECTION", Value: direction},
@@ -81,39 +85,15 @@ func createOrUpdateJobRclone(ctx context.Context,
 	}
 
 	labels := map[string]string{}
-	return createOrUpdateJob(ctx, l, c, job, owner,
-		scheme, labels, containers, volumes, paused, saName)
-}
-
-func envFromSecret(secretName string, field string, optional bool) corev1.EnvVar {
-	return corev1.EnvVar{
-		Name: field,
-		ValueFrom: &corev1.EnvVarSource{
-			SecretKeyRef: &corev1.SecretKeySelector{
-				LocalObjectReference: corev1.LocalObjectReference{
-					Name: secretName,
-				},
-				Key:      field,
-				Optional: &optional,
-			},
-		},
-	}
+	return o.reconcileJob(labels, containers, volumes)
 }
 
 //nolint:funlen
-func createOrUpdateJobRestic(ctx context.Context,
-	l logr.Logger,
-	c client.Client,
-	job *batchv1.Job,
-	owner metav1.Object,
-	scheme *runtime.Scheme,
-	dataPVCName string,
+func (o *jobOptions) reconcileResticJob(dataPVCName string,
 	cachePVCName string,
 	resticSecretName string,
 	forgetOptions string,
-	actions []string,
-	paused bool,
-	saName string) (bool, error) {
+	actions []string) (bool, error) {
 	env := []corev1.EnvVar{
 		{Name: "FORGET_OPTIONS", Value: forgetOptions},
 		{Name: "DATA_DIR", Value: mountPath},
@@ -197,23 +177,14 @@ func createOrUpdateJobRestic(ctx context.Context,
 	}
 
 	labels := map[string]string{}
-	return createOrUpdateJob(ctx, l, c, job, owner,
-		scheme, labels, containers, volumes, paused, saName)
+	return o.reconcileJob(labels, containers, volumes)
 }
 
-func createOrUpdateJobRsync(ctx context.Context,
-	l logr.Logger,
-	c client.Client,
-	job *batchv1.Job,
-	owner metav1.Object,
-	scheme *runtime.Scheme,
-	labels map[string]string,
+func (o *jobOptions) reconcileRsyncJob(labels map[string]string,
 	envVars []corev1.EnvVar,
 	command []string,
 	dataPVCName string,
-	sshSecretName string,
-	paused bool,
-	saName string) (bool, error) {
+	sshSecretName string) (bool, error) {
 	runAsUser := int64(0)
 	containers := []corev1.Container{{
 		Name:    "rsync",
@@ -249,56 +220,62 @@ func createOrUpdateJobRsync(ctx context.Context,
 		},
 	}
 
-	return createOrUpdateJob(ctx, l, c, job, owner,
-		scheme, labels, containers, volumes, paused, saName)
+	return o.reconcileJob(labels, containers, volumes)
 }
 
-func createOrUpdateJob(ctx context.Context,
-	l logr.Logger,
-	c client.Client,
-	job *batchv1.Job,
-	owner metav1.Object,
-	scheme *runtime.Scheme,
-	labels map[string]string,
+func (o *jobOptions) reconcileJob(labels map[string]string,
 	containers []corev1.Container,
-	volumes []corev1.Volume,
-	paused bool,
-	saName string) (bool, error) {
+	volumes []corev1.Volume) (bool, error) {
 	backoffLimit := int32(2)
 
-	op, err := ctrlutil.CreateOrUpdate(ctx, c, job, func() error {
-		if err := ctrl.SetControllerReference(owner, job, scheme); err != nil {
-			l.Error(err, "unable to set controller reference")
+	op, err := ctrlutil.CreateOrUpdate(o.ctx, o.c, o.job, func() error {
+		if err := ctrl.SetControllerReference(o.owner, o.job, o.scheme); err != nil {
+			o.l.Error(err, "unable to set controller reference")
 			return err
 		}
-		if job.Spec.Template.Labels == nil {
-			job.Spec.Template.Labels = map[string]string{}
+		if o.job.Spec.Template.Labels == nil {
+			o.job.Spec.Template.Labels = map[string]string{}
 		}
 		for k, v := range labels {
-			job.Spec.Template.Labels[k] = v
+			o.job.Spec.Template.Labels[k] = v
 		}
-		job.Spec.BackoffLimit = &backoffLimit
+		o.job.Spec.BackoffLimit = &backoffLimit
 		parallelism := int32(1)
-		if paused {
+		if o.paused {
 			parallelism = 0
 		}
-		job.Spec.Parallelism = &parallelism
-		job.Spec.Template.Spec.Containers = containers
-		job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
-		job.Spec.Template.Spec.ServiceAccountName = saName
-		job.Spec.Template.Spec.Volumes = volumes
+		o.job.Spec.Parallelism = &parallelism
+		o.job.Spec.Template.Spec.Containers = containers
+		o.job.Spec.Template.Spec.RestartPolicy = corev1.RestartPolicyNever
+		o.job.Spec.Template.Spec.ServiceAccountName = o.saName
+		o.job.Spec.Template.Spec.Volumes = volumes
 		return nil
 	})
-	if job.Status.Failed >= backoffLimit {
-		l.Info("deleting job -- backoff limit exceeded")
-		err = c.Delete(ctx, job, client.PropagationPolicy(metav1.DeletePropagationBackground))
+	if o.job.Status.Failed >= backoffLimit {
+		o.l.Info("deleting job -- backoff limit exceeded")
+		err = o.c.Delete(o.ctx, o.job, client.PropagationPolicy(metav1.DeletePropagationBackground))
 		return false, err
 	}
 	if err != nil {
-		l.Error(err, "job reconcile failed")
+		o.l.Error(err, "job reconcile failed")
 		return false, err
 	}
 
-	l.Info("job reconciled", "operation", op)
+	o.l.Info("job reconciled", "operation", op)
 	return true, nil
+}
+
+func envFromSecret(secretName string, field string, optional bool) corev1.EnvVar {
+	return corev1.EnvVar{
+		Name: field,
+		ValueFrom: &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: secretName,
+				},
+				Key:      field,
+				Optional: &optional,
+			},
+		},
+	}
 }

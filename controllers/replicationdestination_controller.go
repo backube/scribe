@@ -467,7 +467,17 @@ func (r *resticDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 			Namespace: r.Instance.Namespace,
 		},
 	}
-	logger := l.WithValues("job", nameFor(r.job))
+
+	o := jobOptions{
+		ctx:    r.Ctx,
+		l:      l.WithValues("job", nameFor(r.job)),
+		c:      r.Client,
+		job:    r.job,
+		owner:  r.Instance,
+		scheme: r.Scheme,
+		paused: r.Instance.Spec.Paused,
+		saName: r.serviceAccount.Name,
+	}
 
 	forgetOptions := "" // forget isn't used on restore
 	resticSecretName := r.resticRepositorySecret.Name
@@ -475,12 +485,10 @@ func (r *resticDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 	dataPVCName := r.PVC.Name
 	cachePVCName := r.resticCache.Name
 
-	cont, err := createOrUpdateJobRestic(r.Ctx, logger, r.Client, r.job,
-		r.Instance, r.Scheme, dataPVCName, cachePVCName, resticSecretName,
-		forgetOptions, actions, r.Instance.Spec.Paused, r.serviceAccount.Name)
+	cont, err := o.reconcileResticJob(dataPVCName, cachePVCName, resticSecretName, forgetOptions, actions)
 
-	// Only continue reconciling if cou says it's ok AND the job has succeeded
-	// (sync finished).
+	// Only continue reconciling if reconcile says it's ok AND the job has
+	// succeeded (sync finished).
 	return cont && r.job.Status.Succeeded == 1, err
 }
 
@@ -655,7 +663,17 @@ func (r *rsyncDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 			Namespace: r.Instance.Namespace,
 		},
 	}
-	logger := l.WithValues("job", nameFor(r.job))
+
+	o := jobOptions{
+		ctx:    r.Ctx,
+		l:      l.WithValues("job", nameFor(r.job)),
+		c:      r.Client,
+		job:    r.job,
+		owner:  r.Instance,
+		scheme: r.Scheme,
+		paused: r.Instance.Spec.Paused,
+		saName: r.serviceAccount.Name,
+	}
 
 	labels := r.serviceSelector()
 	env := []corev1.EnvVar{}
@@ -663,12 +681,10 @@ func (r *rsyncDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 	dataPVCName := r.PVC.Name
 	sshSecretName := r.destSecret.Name
 
-	cont, err := createOrUpdateJobRsync(r.Ctx, logger, r.Client, r.job,
-		r.Instance, r.Scheme, labels, env, command, dataPVCName, sshSecretName,
-		r.Instance.Spec.Paused, r.serviceAccount.Name)
+	cont, err := o.reconcileRsyncJob(labels, env, command, dataPVCName, sshSecretName)
 
-	// Only continue reconciling if cou says it's ok AND the job has succeeded
-	// (sync finished).
+	// Only continue reconciling if reconcile says it's ok AND the job has
+	// succeeded (sync finished).
 	return cont && r.job.Status.Succeeded == 1, err
 }
 
@@ -680,7 +696,17 @@ func (r *rcloneDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 			Namespace: r.Instance.Namespace,
 		},
 	}
-	logger := l.WithValues("job", nameFor(r.job))
+
+	o := jobOptions{
+		ctx:    r.Ctx,
+		l:      l.WithValues("job", nameFor(r.job)),
+		c:      r.Client,
+		job:    r.job,
+		owner:  r.Instance,
+		scheme: r.Scheme,
+		paused: r.Instance.Spec.Paused,
+		saName: r.serviceAccount.Name,
+	}
 
 	destPath := *r.Instance.Spec.Rclone.RcloneDestPath
 	direction := "destination"
@@ -688,10 +714,7 @@ func (r *rcloneDestReconciler) ensureJob(l logr.Logger) (bool, error) {
 	dataPVCName := r.PVC.Name
 	rcloneSecretName := r.rcloneConfigSecret.Name
 
-	cont, err := createOrUpdateJobRclone(r.Ctx, logger, r.Client, r.job,
-		r.Instance, r.Scheme, dataPVCName, rcloneSecretName, destPath,
-		direction, configSection, r.Instance.Spec.Paused,
-		r.serviceAccount.Name)
+	cont, err := o.reconcileRcloneJob(dataPVCName, rcloneSecretName, destPath, direction, configSection)
 
 	// Only continue reconciling if cou says it's ok AND the job has succeeded
 	// (sync finished).
