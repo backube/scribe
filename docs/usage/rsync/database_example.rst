@@ -54,7 +54,7 @@ the value of the address and create the ReplicationSource object.
 
 .. code:: bash
 
-   $ sed -i 's/my.host.com/10.107.249.72/g' examples/scribe_v1alpha1_replicationsource.yaml
+   $ sed -i 's/my.host.com/10.107.249.72/g' examples/rsync/scribe_v1alpha1_replicationsource.yaml
    $ kubectl create -n source -f examples/rsync/scribe_v1alpha1_replicationsource.yaml
 
 To verify the replication has completed describe the Replication source.
