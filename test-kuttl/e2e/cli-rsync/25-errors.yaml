@@ -1,0 +1,10 @@
+---
+apiVersion: scribe.backube/v1alpha1
+kind: ReplicationDestination
+metadata:
+  name: dest
+---
+apiVersion: scribe.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: source

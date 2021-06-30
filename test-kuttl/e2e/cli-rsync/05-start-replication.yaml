@@ -1,0 +1,17 @@
+---
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - timeout: 300
+    command: >-
+      ../../../bin/kubectl-scribe start-replication
+        --source-namespace ${NAMESPACE}
+        --source-copy-method Clone
+        --source-cron-spec '* * * * *'
+        --source-pvc data-source
+        --source-name source
+        --dest-namespace ${NAMESPACE}
+        --dest-name dest
+        --dest-copy-method Snapshot
+        --dest-capacity 1Gi
+        --dest-access-mode ReadWriteOnce
