@@ -192,6 +192,12 @@ type ReplicationDestinationResticSpec struct {
 	// accessModes can be used to set the accessModes of restic metadata cache volume
 	//+optional
 	CacheAccessModes []v1.PersistentVolumeAccessMode `json:"cacheAccessModes,omitempty"`
+	// Previous specifies the number of image to skip before selecting one to restore from
+	//+optional
+	Previous int32 `json:"previous,omitempty"`
+	// RestoreAsOf refers to the backup that is most recent as of that time.
+	//+optional
+	RestoreAsOf *string `json:"restoreAsOf,omitempty"`
 }
 
 // ReplicationDestinationStatus defines the observed state of ReplicationDestination
