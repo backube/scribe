@@ -196,6 +196,7 @@ type ReplicationDestinationResticSpec struct {
 	//+optional
 	Previous int32 `json:"previous,omitempty"`
 	// RestoreAsOf refers to the backup that is most recent as of that time.
+	// +kubebuilder:validation:Format="date-time"
 	//+optional
 	RestoreAsOf *string `json:"restoreAsOf,omitempty"`
 }
