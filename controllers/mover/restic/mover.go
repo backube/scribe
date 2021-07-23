@@ -56,6 +56,8 @@ type Mover struct {
 	cacheCapacity         *resource.Quantity
 	cacheStorageClassName *string
 	repositoryName        string
+	previous              int32
+	restoreAsOf           *string
 	isSource              bool
 	paused                bool
 	mainPVCName           *string
