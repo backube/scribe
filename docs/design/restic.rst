@@ -2,6 +2,8 @@
 Restic-based data mover
 =======================
 
+.. include:: ../renamed.rst
+
 .. admonition:: Enhancement status
 
    Status: Proposed

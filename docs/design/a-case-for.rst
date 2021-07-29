@@ -2,6 +2,8 @@
 A case for Scribe
 =================
 
+.. include:: ../renamed.rst
+
 .. contents::
    :depth: 2
 

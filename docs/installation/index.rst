@@ -2,6 +2,8 @@
 Installation
 ============
 
+.. include:: ../renamed.rst
+
 The following directions will walk through the process of deploying Scribe.
 
 .. note::

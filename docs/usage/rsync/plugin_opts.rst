@@ -3,6 +3,8 @@
 Scribe Plugin Options with Defaults
 ====================================
 
+.. include:: ../../renamed.rst
+
 These may be passed as :code:`key: value` pairs in a file, on the command-line, or a combination of both.
 Command-line values override the config file values.
 

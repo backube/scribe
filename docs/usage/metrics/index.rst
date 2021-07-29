@@ -2,6 +2,8 @@
 Metrics & monitoring
 ====================
 
+.. include:: ../../renamed.rst
+
 In order to support monitoring of replication relationships, Scribe exports a
 number of metrics that can be scraped with Prometheus. These metrics permit
 monitoring whether volumes are "in sync" and how long the synchronization

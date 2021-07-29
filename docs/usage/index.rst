@@ -2,6 +2,8 @@
 Usage
 =====
 
+.. include:: ../renamed.rst
+
 .. toctree::
    :hidden:
 

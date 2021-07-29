@@ -2,6 +2,8 @@
 Enhancement proposals
 =====================
 
+.. include:: ../renamed.rst
+
 .. toctree::
    :titlesonly:
 

@@ -2,6 +2,8 @@
 Rsync Database Cross-Cluster Plugin Example
 ===========================================
 
+.. include:: ../../renamed.rst
+
 This example will sync data from mysql database persistent volumes
 For this example, sync will happen between 2 clusters. Data will be synced
 from cluster-name :code:`api-source-com:6443` to cluster-name :code:`destination123`
