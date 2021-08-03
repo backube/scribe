@@ -20,6 +20,7 @@ package restic
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -56,8 +57,6 @@ type Mover struct {
 	cacheCapacity         *resource.Quantity
 	cacheStorageClassName *string
 	repositoryName        string
-	previous              int32
-	restoreAsOf           *string
 	isSource              bool
 	paused                bool
 	mainPVCName           *string
@@ -65,6 +64,9 @@ type Mover struct {
 	pruneInterval *int32
 	retainPolicy  *scribev1alpha1.ResticRetainPolicy
 	sourceStatus  *scribev1alpha1.ReplicationSourceResticStatus
+	// Destination-only fields
+	previous    int32
+	restoreAsOf *string
 }
 
 var _ mover.Mover = &Mover{}
@@ -267,7 +269,7 @@ func (m *Mover) ensureJob(ctx context.Context, cachePVC *v1.PersistentVolumeClai
 		}
 		utils.MarkForCleanup(m.owner, job)
 		job.Spec.Template.ObjectMeta.Name = job.Name
-		backoffLimit := int32(8)
+		backoffLimit := int32(999999999)
 		job.Spec.BackoffLimit = &backoffLimit
 		parallelism := int32(1)
 		if m.paused {
@@ -276,6 +278,9 @@ func (m *Mover) ensureJob(ctx context.Context, cachePVC *v1.PersistentVolumeClai
 		job.Spec.Parallelism = &parallelism
 		forgetOptions := generateForgetOptions(m.retainPolicy)
 		runAsUser := int64(0)
+		// set default values
+		var restoreAsOf = time.Now().String()
+		var previous = strconv.Itoa(int(int32(0)))
 
 		var actions []string
 		if m.isSource {
@@ -285,6 +290,11 @@ func (m *Mover) ensureJob(ctx context.Context, cachePVC *v1.PersistentVolumeClai
 			}
 		} else {
 			actions = []string{"restore"}
+			// set the restore selection options when the mover has them
+			if m.restoreAsOf != nil {
+				restoreAsOf = *m.restoreAsOf
+			}
+			previous = strconv.Itoa(int(m.previous))
 		}
 		logger.Info("job actions", "actions", actions)
 
@@ -294,6 +304,8 @@ func (m *Mover) ensureJob(ctx context.Context, cachePVC *v1.PersistentVolumeClai
 				{Name: "FORGET_OPTIONS", Value: forgetOptions},
 				{Name: "DATA_DIR", Value: mountPath},
 				{Name: "RESTIC_CACHE_DIR", Value: resticCacheMountPath},
+				{Name: "RESTORE_AS_OF", Value: restoreAsOf},
+				{Name: "SELECT_PREVIOUS", Value: previous},
 				// We populate environment variables from the restic repo
 				// Secret. They are taken 1-for-1 from the Secret into env vars.
 				// The allowed variables are defined by restic.

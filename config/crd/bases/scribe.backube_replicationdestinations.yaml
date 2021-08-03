@@ -185,8 +185,8 @@ spec:
                   restoreAsOf:
                     description: RestoreAsOf refers to the backup that is most recent
                       as of that time.
-                    type: string
                     format: date-time
+                    type: string
                   storageClassName:
                     description: storageClassName can be used to specify the StorageClass
                       of the destination volume. If not set, the default StorageClass
