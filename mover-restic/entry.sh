@@ -171,7 +171,7 @@ function select_restic_snapshot_to_restore() {
         local -i nextIdx=${idx}+1
         # if we reached the end of the list
         if ((${nextIdx} == ${#epochs[@]})); then
-        break
+	        break
         fi
         ((idx++))
     done
@@ -190,10 +190,7 @@ function select_restic_snapshot_to_restore() {
 
 function do_restore {
     echo "=== Starting restore ==="
-    echo "RestoreAsOf: ${RESTORE_AS_OF}"
-    echo "SelectPrevious: ${SELECT_PREVIOUS}"
     local snapshot_id=$(select_restic_snapshot_to_restore)
-    sleep 999999
     pushd "${DATA_DIR}"
     restic restore -t . --host "${RESTIC_HOST}" "${snapshot_id}"
     popd
