@@ -2,6 +2,8 @@
 SSH keys
 ========
 
+.. include:: ../../renamed.rst
+
 Scribe generates SSH keys upon the deployment of a ReplicationDestination object
 but SSH keys can also be provided to Scribe rather than generating new ones. The
 steps below will describe the process to provide Scribe SSH keys.

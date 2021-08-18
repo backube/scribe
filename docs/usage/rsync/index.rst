@@ -2,6 +2,8 @@
 Rsync-based replication
 =======================
 
+.. include:: ../../renamed.rst
+
 .. toctree::
    :hidden:
 

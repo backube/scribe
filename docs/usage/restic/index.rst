@@ -2,6 +2,8 @@
 Restic-based backup
 ===================
 
+.. include:: ../../renamed.rst
+
 .. toctree::
    :hidden:
 

@@ -13,6 +13,8 @@ Overview
    usage/index
    design/index
 
+.. include:: ./renamed.rst
+
 *Asynchronous volume replication for Kubernetes CSI storage*
 
 Scribe is a Kubernetes operator that performs asynchronous replication of

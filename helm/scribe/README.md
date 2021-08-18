@@ -1,4 +1,25 @@
-# Scribe
+# ~Scribe~ is now VolSync
+
+![Attention!](https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/Warning.svg/156px-Warning.svg.png)
+
+**The Scribe project has been renamed to
+[VolSync](https://github.com/backube/volsync)!  
+As a part of that process, some things have moved, including this Helm chart.**
+
+Please install the [VolSync
+chart](https://artifacthub.io/packages/helm/backube-helm-charts/volsync) instead
+of this one.
+
+Please update your links:
+
+- Source:
+  [https://github.com/backube/volsync](https://github.com/backube/volsync).
+- Documentation:
+  [https://volsync.readthedocs.io](https://volsync.readthedocs.io)
+- Helm chart:
+  [https://artifacthub.io/packages/helm/backube-helm-charts/volsync](https://artifacthub.io/packages/helm/backube-helm-charts/volsync)
+
+------
 
 Asynchronous volume replication for Kubernetes CSI storage
 

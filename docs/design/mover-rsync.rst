@@ -2,6 +2,8 @@
 Rsync-based data mover
 ======================
 
+.. include:: ../renamed.rst
+
 This document covers the design of the rsync-based data mover.
 
 .. contents::

@@ -2,6 +2,8 @@
 Triggers
 ========
 
+.. include:: ../renamed.rst
+
 There are three types of triggers in scribe:
 
 1. Always - no trigger, always run.

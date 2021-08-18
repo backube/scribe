@@ -2,6 +2,8 @@
 Rclone Database Example
 =======================
 
+.. include:: ../../renamed.rst
+
 The following example will use the Rclone replication method and take a Snapshot
 at the source. A MySQL database will be used as the example application.
 

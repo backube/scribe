@@ -2,6 +2,8 @@
 Configuration and CRDs
 ======================
 
+.. include:: ../renamed.rst
+
 This document covers the rationale for how Scribe is configured and the
 structure of the CustomResourceDefinitions.
 

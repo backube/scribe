@@ -2,6 +2,8 @@
 Understanding ``rclone-secret``
 ===============================
 
+.. include:: ../../renamed.rst
+
 What is ``rclone-secret``?
 ==========================
 

@@ -1,63 +1,23 @@
-# Scribe
+# ~Scribe~ is now VolSync
+
+![Attention!](https://upload.wikimedia.org/wikipedia/commons/thumb/1/17/Warning.svg/156px-Warning.svg.png)
+
+**The Scribe project has been renamed to
+[VolSync](https://github.com/backube/volsync)!  
+As a part of the renaming process, this source repository and project
+documentation have moved.**
+
+Come find us at:
+
+* Code: [https://github.com/backube/volsync](https://github.com/backube/volsync).
+* Documentation: [https://volsync.readthedocs.io](https://volsync.readthedocs.io).
+
+------
+
+------
 
 Scribe asynchronously replicates Kubernetes persistent volumes between clusters
-using either rsync or rclone depending on the number of destinations.
-
-[![Documentation
-Status](https://readthedocs.org/projects/scribe-replication/badge/?version=latest)](https://scribe-replication.readthedocs.io/en/latest/?badge=latest)
-[![Go Report
-Card](https://goreportcard.com/badge/github.com/backube/scribe)](https://goreportcard.com/report/github.com/backube/scribe)
-[![codecov](https://codecov.io/gh/backube/scribe/branch/master/graph/badge.svg)](https://codecov.io/gh/backube/scribe)
-![maturity](https://img.shields.io/static/v1?label=maturity&message=alpha&color=red)
-
-![Documentation](https://github.com/backube/scribe/workflows/Documentation/badge.svg)
-![operator](https://github.com/backube/scribe/workflows/operator/badge.svg)
-
-## Getting started
-
-### Try Scribe in Kind
-
-For a convenient script to start a `kind cluster`, try this
-[script to setup a kind cluster](hack/setup-kind-cluster.sh).
-
-### Try Scribe in a Kind, Kubernetes, or Openshift cluster
-
-Follow the steps in the [installation
-instructions](https://scribe-replication.readthedocs.io/en/latest/installation/index.html).
-Here are
-[useful commands to configure cluster storage classes](https://scribe-replication.readthedocs.io/en/latest/installation/index.html#configure-default-csi-storage).
-
-## Scribe kubectl plugin
-
-To try out Scribe with a command line interface `scribe`:
-
-```bash
-make cli
-cp bin/kubectl-scribe /usr/local/bin/
-```
-
-**NOTE:** `scribe` tool is being actively developed. Options, flags,
-and names are likely to be updated frequently. PRs and new issues are welcome!
-
-Available commands:
-
-```bash
-kubectl scribe start-replication
-kubectl scribe set-replication
-kubectl scribe continue-replication
-kubectl scribe remove-replication
-```
-
-* Try the current examples:
-  * [single cluster cross namespace example](./docs/usage/rsync/db-example-cli.md)
-  * [multiple cluster example](./docs/usage/rsync/multi-context-sync-cli.md)
-
-## Helpful links
-
-* [Scribe documentation](https://scribe-replication.readthedocs.io)
-* [Changelog](CHANGELOG.md)
-* [Contributing guidelines](https://github.com/backube/.github/blob/master/CONTRIBUTING.md)
-* [Organization code of conduct](https://github.com/backube/.github/blob/master/CODE_OF_CONDUCT.md)
+using rsync, rclone, or restic.
 
 ## Licensing
 

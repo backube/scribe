@@ -1,6 +1,8 @@
 ==============
 External Rsync
 ==============
+.. include:: ../../renamed.rst
+
 A situation may occur where data needs to be imported into a Kubernetes environment.
 In the Scribe repository, the script `bin/external-rsync-source` can be executed
 which will serve as the `replicationsource` allowing data to be replicated to a

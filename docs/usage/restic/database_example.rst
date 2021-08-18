@@ -2,6 +2,8 @@
 Restic Database Example
 =======================
 
+.. include:: ../../renamed.rst
+
 Restic backup
 =============
 
